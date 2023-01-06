@@ -1,12 +1,12 @@
 FLAGS = -W -O3
 .PHONY = all clean cleanall
 
-all: calc
+all: gebalang
 
-calc: 1.y 1.l
-	bison -o calc_y.c -d 1.y
-	flex -o calc_l.c 1.l
-	$(CC) $(FLAGS) -o calc calc_y.c calc_l.c
+gebalang: gebalang_y.y gebalang_l.l
+	bison -o yacc.cpp -d gebalang_y.y
+	flex -o lexer.cpp gebalang_l.l
+	$(CC++) $(FLAGS) -o gebalang yacc.cpp lexer.cpp
 	
 clean:
 	rm -f build/*.cpp build/*.hpp build/*.o
