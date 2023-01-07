@@ -5,8 +5,7 @@
     #define YYSTYPE long
     int yylex (void);
     long pow(long a, long b);
-    int yyerror (char MULTs);
-    long inv1234576(long a);
+    int yyerror (char *s);
 
     enum token{
         PROCEDURE,
@@ -36,15 +35,15 @@
         command
     };
 
-    typedef struct parseTreeNode{
+    typedef struct ParseTreeNode{
         std::list<token>            tokens;
         std::list<std::string>      params;
-        parseTreeNode*               parent;
-        std::list<parseTreeNode*>    childs;
-    } parseTreeNode;
+        ParseTreeNode*               parent;
+        std::list<ParseTreeNode*>    childs;
+    } ParseTreeNode;
 
     typedef struct procedureInfo{
-        parseTreeNode* procedureTree;
+        ParseTreeNode* procedureTree;
         int startLine;
         bool used;        
     }procedureInfo;
@@ -52,12 +51,12 @@
     std::map<std::string, procedureInfo> procedures;
     std::map<std::string, int> variables;
 
-    parseTreeNode program;
+    ParseTreeNode program;
 
 %}
 
-/* Bison declarations. MULT/
-%define api.value.type {parseTreeNode*}
+/* Bison declarations. */
+%define api.value.type {ParseTreeNode*}
 %token PROCEDURE,
 %token IS VAR,
 %token BEGIN,
@@ -82,13 +81,13 @@
 %token ERROR
 %left '-' 'PLUS'
 %left '*' '/'
-%precedence NEG   /* negation--unary minus MULT/
-%right '^'        /* exponentiation MULT/
+%precedence NEG   /* negation--unary minus */
+%right '^'        /* exponentiation */
 
-%% /* The grammar follows. MULT/
+%% /* The grammar follows. */
 program_all: procedures main
 {
-    parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+    ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
     token t=program_all;
     (node->childs).insert($1);
     (node->childs).insert($2);
@@ -97,10 +96,7 @@ program_all: procedures main
 
 procedures: procedures PROCEDURE proc_head IS VAR declarations BEGIN commands END   
             {
-                #nazwami procedur mapowac ich index w liscie procedur
-                #dodac procedure do mapy
-                
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=procedures;
                 (node->tokens).insert(t);
                 (node->childs).insert($1);
@@ -115,7 +111,7 @@ procedures: procedures PROCEDURE proc_head IS VAR declarations BEGIN commands EN
             }
             | procedures PROCEDURE proc_head IS BEGIN commands END
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=procedures;
                 (node->tokens).insert(t);
                 (node->childs).insert($3);
@@ -132,7 +128,7 @@ procedures: procedures PROCEDURE proc_head IS VAR declarations BEGIN commands EN
 main: PROGRAM IS VAR declarations BEGIN commands END
     {
         #podpiac pod program
-        parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+        ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
         token t=main;
         (node->tokens).insert(t);
         (node->childs).insert($3);
@@ -145,7 +141,7 @@ main: PROGRAM IS VAR declarations BEGIN commands END
     }
      | PROGRAM IS BEGIN commands END
      {
-        parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+        ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
         token t=main;
         (node->tokens).insert(t);
         (node->childs).insert($3);
@@ -157,7 +153,7 @@ main: PROGRAM IS VAR declarations BEGIN commands END
 
 commands: commands command
         {
-            parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=commands;
             (node->tokens).insert(t);
             (node->childs).insert($1);
@@ -166,7 +162,7 @@ commands: commands command
         }
          | command
         {
-            parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=commands;
             (node->tokens).insert(t);
             (node->childs).insert($1);
@@ -176,7 +172,7 @@ commands: commands command
 command: identifier ASSIGN expression SEMI
          | IF condition THEN commands ELSE commands ENDIF
         {
-            parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=command;
             (node->tokens).insert(t);
             (node->childs).insert($2);
@@ -190,7 +186,7 @@ command: identifier ASSIGN expression SEMI
         }
          | IF condition THEN commands ENDIF
         {
-            parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=command;
             (node->tokens).insert(t);
             (node->childs).insert($2);
@@ -202,7 +198,7 @@ command: identifier ASSIGN expression SEMI
         }
          | WHILE condition DO commands ENDWHILE
         {
-            parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=command;
             (node->tokens).insert(t);
             (node->childs).insert($2);
@@ -214,7 +210,7 @@ command: identifier ASSIGN expression SEMI
         }
          | REPEAT commands UNTIL condition SEMI
         {
-            parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=command;
             (node->tokens).insert(t);
             (node->childs).insert($2);
@@ -225,7 +221,7 @@ command: identifier ASSIGN expression SEMI
         }
          | proc_head SEMI
         {
-            parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=command;
             (node->tokens).insert(t);
             (node->childs).insert($1);
@@ -234,7 +230,7 @@ command: identifier ASSIGN expression SEMI
         }
          | READ identifier SEMI
         {
-            parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=command;
             (node->tokens).insert(t);
             (node->childs).insert($2);
@@ -243,7 +239,7 @@ command: identifier ASSIGN expression SEMI
         }
          | WRITE value SEMI
         {
-            parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=command;
             (node->tokens).insert(t);
             (node->childs).insert($2);
@@ -253,7 +249,7 @@ command: identifier ASSIGN expression SEMI
 
 proc_head: identifier ( declarations )
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=proc_head;
                 (node->tokens).insert(t);
                 (node->childs).insert($1);
@@ -263,7 +259,7 @@ proc_head: identifier ( declarations )
 
 declarations: declarations , identifier
                 {
-                    parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                    ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                     token t=declarations;
                     (node->tokens).insert(t);
                     (node->childs).insert($1);
@@ -272,7 +268,7 @@ declarations: declarations , identifier
                 }
                  | identifier
                 {
-                    parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                    ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                     token t=declarations;
                     (node->tokens).insert(t);
                     (node->childs).insert($1);
@@ -281,15 +277,16 @@ declarations: declarations , identifier
 
 expression: value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=expression;
                 (node->tokens).insert(t);
                 (node->childs).insert($1);
+                (node->params).insert("NULL");
                 $$=node;
             }
              | value PLUS value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=expression;
                 (node->tokens).insert(t);
                 (node->params).insert("PLUS");
@@ -299,7 +296,7 @@ expression: value
             }
              | value MINUS value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=expression;
                 (node->tokens).insert(t);
                 (node->params).insert("MINUS");
@@ -309,7 +306,7 @@ expression: value
             }
              | value MULT value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=expression;
                 (node->tokens).insert(t);
                 (node->params).insert("MULT");
@@ -319,7 +316,7 @@ expression: value
             }
              | value DIV value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=expression;
                 (node->tokens).insert(t);
                 (node->params).insert("DIV");
@@ -329,7 +326,7 @@ expression: value
             }
              | value MOD value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=expression;
                 (node->tokens).insert(t);
                 (node->params).insert("MOD");
@@ -340,17 +337,17 @@ expression: value
 
 condition: value = value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=condition;
                 (node->tokens).insert(t);
-                (node->params).insert("=");
+                (node->params).insert("EQ");
                 (node->childs).insert($1);
                 (node->childs).insert($3);
                 $$=node;
             }
              | value NEQ value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=condition;
                 (node->tokens).insert(t);
                 (node->params).insert("NEQ");
@@ -360,7 +357,7 @@ condition: value = value
             }
              | value GT value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=condition;
                 (node->tokens).insert(t);
                 (node->params).insert("GT");
@@ -370,7 +367,7 @@ condition: value = value
             }
              | value LT value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=condition;
                 (node->tokens).insert(t);
                 (node->params).insert("LT");
@@ -380,7 +377,7 @@ condition: value = value
             }
              | value GTE value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=condition;
                 (node->tokens).insert(t);
                 (node->params).insert("GTE");
@@ -390,7 +387,7 @@ condition: value = value
             }
              | value LTE value
             {
-                parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
                 token t=condition;
                 (node->tokens).insert(t);
                 (node->params).insert("LTE");
@@ -401,7 +398,7 @@ condition: value = value
 
 value: num
         {
-            /*parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            /*ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=num;
             (node->tokens).insert(t)
             (node->params).insert=$1
@@ -409,7 +406,7 @@ value: num
 
             //$$=$1;
 
-            parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=value;
             (node->tokens).insert(t);
             (node->params).insert("num")
@@ -418,7 +415,7 @@ value: num
         }
          | identifier
         {
-            /*parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            /*ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=identifier;
             (node->tokens).insert(t)
             (node->params).insert("identifier")
@@ -426,7 +423,7 @@ value: num
             $$=node*/
 
             //$$=$1;
-            parseTreeNode* node = reinterpret_cast<parseTreeNode*>(malloc(sizeof(parseTreeNode)));
+            ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
             token t=value;
             (node->tokens).insert(t);
             (node->childs).insert($1);
@@ -434,28 +431,8 @@ value: num
         }
 ;
 %%
-long pow(long a, long b)
-{
-    a = a%1234577;
-    long ret=1;
-    for(int i = 0; i<b; iPLUSPLUS)
-    {
-        ret*=a;
-        ret %= 1234577;
-    }
-    return ret;
-}
 
-long inv1234576(long a)
-{
-    for(long i = 1; i<1234576; iPLUSPLUS)
-    {
-        if((a*i)%1234576==1)    return i;
-    }
-    return 0;
-}
-
-int yyerror(char MULTs)
+int yyerror(char *s)
 {
     printf("%s\n",s);	
     yyparse();
