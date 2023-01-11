@@ -57,28 +57,31 @@
 
 /* Bison declarations. */
 %define api.value.type {ParseTreeNode*}
-%token PROCEDURE,
-%token IS VAR,
-%token BEGIN,
-%token END,
-%token IS BEGIN,
-%token PROGRAM,
-%token IF,
-%token THEN,
-%token ELSE,
-%token ENDIF,
-%token WHILE,
-%token DO,
-%token ENDWHILE,
-%token REPEAT,
-%token UNTIL,
-%token READ,
-%token WRITE,
-%token num,
+%token PROCEDURE
+%token IS 
+%token VAR
+%token BEGIN
+%token END
+%token IS BEGIN
+%token PROGRAM
+%token IF
+%token THEN
+%token ELSE
+%token ENDIF
+%token WHILE
+%token DO
+%token ENDWHILE
+%token REPEAT
+%token UNTIL
+%token READ
+%token WRITE
+%token num
 %token identifier
 %token NUM
 %token END
 %token ERROR
+%token ,
+%token
 %left '-' 'PLUS'
 %left '*' '/'
 %precedence NEG   /* negation--unary minus */
@@ -170,6 +173,14 @@ commands: commands command
         }
 
 command: identifier ASSIGN expression SEMI
+            {
+                ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));
+                token t=ASSIGN;
+                (node->tokens).insert(t);
+                (node->childs).insert($1);
+                (node->childs).insert($3);
+                $$=node;
+            }
          | IF condition THEN commands ELSE commands ENDIF
         {
             ParseTreeNode* node = reinterpret_cast<ParseTreeNode*>(malloc(sizeof(ParseTreeNode)));

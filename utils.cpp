@@ -5,128 +5,9 @@
 #include <vector>   //zmienic w bisonie list->vector
 #include <string>
 #include <map>
-
-enum token{
-        PROCEDURE,
-        IS,
-        VAR,    //zmienic w bisonie
-        _BEGIN,
-        END,
-        PROGRAM,
-        IF,
-        THEN,
-        ELSE,
-        ENDIF,
-        WHILE,
-        DO,
-        ENDWHILE,
-        REPEAT,
-        UNTIL,
-        READ,
-        WRITE,
-        value,
-        declarations,
-        condition,
-        expression,
-        num,
-        identifier,
-        proc_head,
-        command
-    };
-
-typedef struct ParseTreeNode{
-    std::vector<token>            tokens;
-    std::vector<std::string>      params;
-    ParseTreeNode*               parent;
-    std::vector<ParseTreeNode*>    childs;
-} ParseTreeNode;
-
-typedef struct ProcedureInfo{
-    ParseTreeNode* procedureTree;
-    int startLine;
-    bool used;        
-}ProcedureInfo;
-
-enum Operator{
-    null,
-    plus,
-    minus,
-    mult,
-    div,
-    mod
-}
-
-enum Comparission{
-    null,
-    neq,
-    eq,
-    gt,
-    gte,
-    lt,
-    lte
-};
-
-enum Operation{
-    READ,
-    WRITE,
-    SEMI,
-    ASSIGN,
-    PLUS,
-    MINUS,
-    MULT,
-    DIV,
-    MOD,
-};
-
-enum ValueType{
-    num,
-    identifier
-}
-
-typedef struct Variable{
-    //std::string name;
-    int     adress;
-    int     value;  //-1 - unpredictable
-}Variable;
-
-std::map<std::string, Variable> variables;
+#include "utils.hpp"
 
 
-typedef union Value{
-    Variable,
-    int
-}Value;
-
-typedef struct Instruction{
-    Operation operation;
-    std::vector<Value> values;
-}Instruction;
-
-typedef struct Condition{
-    Value values[2];
-    Comparission comparission;
-}Condition;
-
-typedef struct Expression{
-    std::vector<Value> values;
-    Operator operator;
-}Expression;
-
-typedef struct ConditionalEdge{
-    InstructionVertex*  end;
-    Condition condition;
-}ConditionalEdge;
-
-typedef union InstructionEdge{
-    ConditionalEdge,
-    InstructionVertex*
-}InstructionEdge;
-
-typedef struct InstructionVertex{
-    int     begin;
-    Instruction                   instruction;
-    std::vector<InstructionEdge>    edges;
-}InstructionVertex;
 
 Value readValue(ParseTreeNode* valueNode)
 {
@@ -147,7 +28,12 @@ Value readValue(ParseTreeNode* valueNode)
 
 Value declareValue(ParseTreeNode* valueNode)
 {
-    //
+    //declare value
+}
+
+Value declareValues(ParseTreeNode* valuesNode)
+{
+    //declare values
 }
 
 Condition readExpression(ParseTreeNode* expressionTree)
@@ -226,19 +112,120 @@ Condition readCondition(ParseTreeNode* conditionTree)
 }
 
 //takes the beginning, returns the end
-InstructionVertex* buildCommandFlowChart(ParseTreeNode* commandTree, InstructionVertex* & beginVertex)
+InstructionVertex* buildCommandFlowChart(ParseTreeNode* commandTree, InstructionVertex* & beginVertex, InstructionVertex* & endVertex)
 {
-    InstructionVertex* commandChart = reinterpret_cast<InstructionVertex*>(malloc(sizeof(InstructionVertex)));;
-    beginVertex->edges.insert(commandChart);
+    InstructionVertex* commandRoot = reinterpret_cast<InstructionVertex*>(malloc(sizeof(InstructionVertex)));
+    beginVertex->edges.insert(commandRoot);
 
     //InstructionVertex* current = commandChart;
     switch(commandTree->params[0])
     {
+        case "ASSIGN":
+        {
+            commandRoot->instruction.operation=ASSIGN;
+            //error jesli zmienna niezadeklarowana
+            std::string variableName = commandTree->childs[0]->params[0];
+            commandRoot->instruction.values.insert(variableName);
+
+            commandRoot->instruction.expression=readExpression(commandTree->childs[1]);
+            commandRoot->edges.insert(endVertex);
+        }
         case "IF":
         {
+            Condition cond1=readCondition(commandTree->childs[0]);
+            commandRoot->instruction.operation=OP_NULL;
+
+
+
+            //end of first edge is chart of commands after then statement
+            ConditionalEdge edge1;
+            edge1.condition=cond1;
+            edge1.end=buildCommandsFlowChart(commandTree->childs[1], commandRoot, endVertex);
+            commandRoot->edges.insert(edge1);
+
+            //if statement is if then else
+            if(!(strcmp(commandTree->params[2], "ELSE" )))
+                commandRoot->edges.insert( buildCommandsFlowChart(commandTree->childs[1], commandRoot, endVertex));
+            else
+                commandRoot->edges.insert(endVertex);
+
+            break;
+        }
+        case "WHILE":
+        {
+            Condition cond1=readCondition(commandTree->childs[0]);
+            commandRoot->instruction.operation=OP_NULL;
+
+            //end of first edge is chart of commands after then statement
+            ConditionalEdge edge1;
+            edge1.condition=cond1;
+            edge1.end=buildCommandsFlowChart(commandTree->childs[1], commandRoot, commandRoot);
+            commandRoot->edges.insert(edge1);
             
+            commandRoot->edges.insert(endVertex);
+
+            break;
+        }
+        case "REPEAT":
+        {
+            Condition cond1=readCondition(commandTree->childs[1]);
+            commandRoot->instruction.operation=OP_NULL;
+            InstructionVertex* untillVertex = reinterpret_cast<InstructionVertex*>(malloc(sizeof(InstructionVertex)));;
+            untillVertex->instruction.operation=OP_NULL;
+            ConditionalEdge edge1;
+            edge1.condition=cond1;
+            edge1.end=commandRoot
+            untillVertex->edges.insert(edge1);
+
+            commandRoot->edges.insert(buildCommandsFlowChart(commandTree->childs[0], commandRoot, untillVertex));
+
+
+            //end of first edge is chart of commands after then statement
+            
+            commandRoot->edges.insert(endVertex);
+
+            break;
+        }
+        case "proc_head":
+        {
+            //call procedure
+            break;
+        }
+        case "READ":
+        {
+            commandRoot->instruction.operation=READ;
+            //error jesli zmienna niezadeklarowana
+            std::string variableName = commandTree->childs[0]->params[0];
+            commandRoot->instruction.values.insert(variableName);
+            commandRoot->edges.insert(endVertex);
+        }
+        case "WRITE":
+        {
+            commandRoot->instruction.operation=READ;
+            commandRoot->instruction.values.insert(readValue(commandTree->childs[0]));
+            commandRoot->edges.insert(endVertex);
         }
     }
+
+    return commandRoot;
+}
+
+InstructionVertex* buildCommandsFlowChart(ParseTreeNode* commandsTree, InstructionVertex* & beginVertex, InstructionVertex* & endVertex)
+{
+    InstructionVertex* commandsRoot = reinterpret_cast<InstructionVertex*>(malloc(sizeof(InstructionVertex)));
+
+    if(commandsTree->childs.size==1)
+    {
+        return buildCommandFlowChart(commandsTree->childs[0], beginVertex, endVertex);
+    }
+    else
+    {
+        //command chart ma dwoch ojcow, deadcodevertex i commandvertexlast
+        InstructionVertex* deadCodeVertex = reinterpret_cast<InstructionVertex*>(malloc(sizeof(InstructionVertex)));
+        deadCodeVertex->instruction=OP_NULL;
+        return buildCommandsFlowChart(commandsTree->childs[0], beginVertex, buildCommandFlowChart(commandsTree->childs[1], deadCodeVertex, endVertex));
+    }
+
 }
 
 InstructionVertex buildFlowChart(ParseTreeNode* programTree)
