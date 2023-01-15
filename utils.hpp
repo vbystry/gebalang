@@ -9,7 +9,11 @@
 #include <string>
 #include <map>
 
-std::map<std::string, Variable> variables;
+std::<std::string, Value> variables;
+
+std::vector<std::string> program;
+
+int freeMem;
 
 enum token{
         PROCEDURE,
@@ -73,7 +77,7 @@ enum Comparission{
 };
 
 enum Operation{
-    OP_NULL,
+    
     READ,
     WRITE,
     SEMI,
@@ -83,7 +87,13 @@ enum Operation{
     MULT,
     DIV,
     MOD,
-    CALL_PROC
+    CALL_PROC,
+    //compiler utils operations
+    HALF,
+    DOUBLE,
+    //do ifa i petli
+    DISPRESSION_BEGIN,
+    DISPRESSION_END
 };
 
 enum ValueType{
@@ -91,16 +101,28 @@ enum ValueType{
     identifier
 }
 
-typedef struct Variable{
+/*class Value
+{
+    public:
+    int value;
+}
+
+class Variable : Value
+{
+    public:
+    int adress;
+}*/
+
+typedef struct Value{
     //std::string name;
-    int     adress;
-    int     value;  //-1 - unpredictable
+    int     adress = -1;    //-1 for numbers
+    int     value;          //-1 - unpredictable
 }Variable;
 
-typedef union Value{
+/*typedef union Value{
     Variable,
     int
-}Value;
+}Value;*/
 
 typedef struct Instruction{
     Operation operation;
@@ -145,5 +167,15 @@ InstructionVertex* buildCommandFlowChart(ParseTreeNode* commandTree, Instruction
 InstructionVertex* buildCommandsFlowChart(ParseTreeNode* commandsTree, InstructionVertex* & beginVertex, InstructionVertex* & endVertex);
 InstructionVertex buildFlowChart(ParseTreeNode* programTree);
 
+//wynik wszystkich operacji trzymany jest w akumulatorze
+//przy optymalizacji predictable variables dodac aktualizacje value po kazdym store
+std::vector<std::string> addValues(Value val1, Value val2);
+std::vector<std::string> subValues(Value val1, Value val2);
+std::vector<std::string> doubleValue(Value val);
+
+//transformacja mult vertex na algorytm ruskich chlopow
+InstructionVertex* transformMultVertex( InstructionVertex* & multVertex);
+
+std::vector<std::string> translateAssignVertex(InstructionVertex* & assignVertex);
 
 #endif  
