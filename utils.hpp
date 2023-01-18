@@ -73,11 +73,14 @@ enum Comparission{
     gt,
     gte,
     lt,
-    lte
+    lte,
+    //
+    true,
+    false
 };
 
 enum Operation{
-    
+    OP_NULL,
     READ,
     WRITE,
     SEMI,
@@ -91,6 +94,8 @@ enum Operation{
     //compiler utils operations
     HALF,
     DOUBLE,
+    ALLOC,
+    END,
     //do ifa i petli
     DISPRESSION_BEGIN,
     DISPRESSION_END
@@ -117,7 +122,8 @@ typedef struct Value{
     //std::string name;
     int     adress = -1;    //-1 for numbers
     int     value;          //-1 - unpredictable
-}Variable;
+    std::string name;
+}Value;
 
 /*typedef union Value{
     Variable,

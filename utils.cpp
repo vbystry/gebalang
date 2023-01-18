@@ -114,6 +114,8 @@ Condition readCondition(ParseTreeNode* conditionTree)
 }
 
 //takes the beginning, returns the end
+//zmienic nonConditionalEdge na conditionalEdge z warunem true
+//ustawiac warun true lub false gdy values predicrtable
 InstructionVertex* buildCommandFlowChart(ParseTreeNode* commandTree, InstructionVertex* & beginVertex, InstructionVertex* & endVertex)
 {
     InstructionVertex* commandRoot = reinterpret_cast<InstructionVertex*>(malloc(sizeof(InstructionVertex)));
@@ -177,8 +179,6 @@ InstructionVertex* buildCommandFlowChart(ParseTreeNode* commandTree, Instruction
             whileEndVertex->edges.push_back(edge2);
             whileEndVertex->edges.push_back(endVertex);
 
-            
-            
             commandRoot->edges.push_back(whileEndVertex);
 
             break;
@@ -239,7 +239,7 @@ InstructionVertex* buildCommandsFlowChart(ParseTreeNode* commandsTree, Instructi
     {
         //command chart ma dwoch ojcow, deadcodevertex i commandvertexlast
         InstructionVertex* deadCodeVertex = reinterpret_cast<InstructionVertex*>(malloc(sizeof(InstructionVertex)));
-        deadCodeVertex->instruction=DISPRESSION_BEGIN;
+        deadCodeVertex->instruction.operation=OP_NULL;
         return buildCommandsFlowChart(commandsTree->childs[0], beginVertex, buildCommandFlowChart(commandsTree->childs[1], deadCodeVertex, endVertex));
     }
 
@@ -247,17 +247,49 @@ InstructionVertex* buildCommandsFlowChart(ParseTreeNode* commandsTree, Instructi
 
 InstructionVertex buildFlowChart(ParseTreeNode* programTree)
 {
-    if( programTree->params[2].compare("VAR")  )
+    InstructionVertex* programRoot = reinterpret_cast<InstructionVertex*>(malloc(sizeof(InstructionVertex)));
+    if( !programTree->params[2].compare("VAR")  )
     {
+        std::vector<Value> values;
         //zadeklaruj zmienne
-    }
+        ParseTreeNode* declarations = programTree->childs[0];
+        while(declarations->childs[1] != nullptr)
+        {
+            Value val;
+            val.name=declarations->childs[1]->params[0];
+            variables.insert({declarations->childs[1]->params[0], val});
+            values.push_back(val);
+            declarations=declarations->childs[0];
+        }
+        Value val;
+        val.name=declarations->childs[0]->params[0];
+        variables.insert({declarations->childs[0]->params[0], val});
+        values.push_back(val);
 
+        programRoot->instruction.operation=ALLOC;
+
+        //przekopiowac po bozemu
+        programRoot->instruction.values=values;
+
+        for(int i=0; i<values.size; i++)
+            programRoot->instruction.values.push_back(values[i]);
+        
+    }
+    else
+        programRoot->instruction.operation=OP_NULL;
+
+    InstructionVertex* programEnd= reinterpret_cast<InstructionVertex*>(malloc(sizeof(InstructionVertex)));
+    programEnd->instruction.operation=END;
+    programRoot->edges.push_back(buildCommandsFlowChart(
+        programTree->childs[1], programRoot, programEnd
+    ))
+
+    return programRoot;
 }
 
 std::vector<std::string> addValues(Value & val1, Value & val2)
 {
     std::vector<std::string> code;
-    Variable ref;
     //if val1 is variable
     std::string i;
     if(val1.adress>-1)
@@ -299,7 +331,6 @@ std::vector<std::string> addValues(Value & val1, Value & val2)
 std::vector<std::string> subValues(Value & val1, Value & val2)
 {
     std::vector<std::string> code;
-    Variable ref;
     //if val1 is variable
     if(val1.adress>-1)
     {
@@ -495,7 +526,7 @@ std::vector<std::string> translateAssignVertex(InstructionVertex* & assignVertex
         i=std::to_string(assignVertex->instruction.values[0].adress);
         code.insert(code.push_back("LOAD " + i));
         break;
-    case div:
+    case div:   //dodac case jesli v2=2^x to robimy halfem, tak samo w modulo
         //initialise tmp
         i=std::to_string(v1.adress);
         code.insert(code.push_back("LOAD " + i));
