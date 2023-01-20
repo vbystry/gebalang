@@ -9,9 +9,19 @@
 #include <string>
 #include <map>
 
-std::<std::string, Value> variables;
+#define NULL_VALUE     {-1,-1}
+#define TRUE_CONDITION {NULL_VALUE, c_true}
+#define NON_COND_EDGE(end)   {end, TRUE_CONDITION}
+
+std::vector<Line> code;
+
+std::vector<std::string, Value> variables;
 
 std::vector<std::string> program;
+
+int jumps_no;
+
+int jump_to_merge=0;
 
 int freeMem;
 
@@ -58,16 +68,16 @@ typedef struct ProcedureInfo{
 }ProcedureInfo;
 
 enum Operator{
-    null,
+    o_null,
     plus,
     minus,
     mult,
     div,
     mod
-}
+};
 
 enum Comparission{
-    null,
+    c_null,
     neq,
     eq,
     gt,
@@ -75,8 +85,8 @@ enum Comparission{
     lt,
     lte,
     //
-    true,
-    false
+    c_true,
+    c_false
 };
 
 enum Operation{
@@ -98,13 +108,14 @@ enum Operation{
     END,
     //do ifa i petli
     DISPRESSION_BEGIN,
-    DISPRESSION_END
+    DISPRESSION_END,
+    procedure
 };
 
 enum ValueType{
     num,
     identifier
-}
+};
 
 /*class Value
 {
@@ -125,10 +136,19 @@ typedef struct Value{
     std::string name;
 }Value;
 
+typedef struct Line{
+    std::string instruction;
+    //void*       parameter;  //optional
+    int jump_number;
+}Line;
 /*typedef union Value{
     Variable,
     int
 }Value;*/
+typedef struct Expression{
+    std::vector<Value> values;
+    Operator operator;
+}Expression;
 
 typedef struct Instruction{
     Operation operation;
@@ -142,25 +162,23 @@ typedef struct Condition{
     Comparission comparission;
 }Condition;
 
-typedef struct Expression{
-    std::vector<Value> values;
-    Operator operator;
-}Expression;
 
-typedef struct ConditionalEdge{
+
+typedef struct Edge{
     InstructionVertex*  end;
     Condition condition;
 }ConditionalEdge;
 
-typedef union InstructionEdge{
-    ConditionalEdge,
-    InstructionVertex*
-}InstructionEdge;
+/*typedef union InstructionEdge{
+    Edge conditionalEdge,
+    InstructionVertex* normalEdge
+}InstructionEdge;*/
 
 typedef struct InstructionVertex{
     int     begin;
     Instruction                   instruction;
-    std::vector<InstructionEdge>    edges;
+    std::vector<Edge>    edges;
+    std::vector<std::string>        code;
 }InstructionVertex;
 
 
@@ -182,6 +200,13 @@ std::vector<std::string> doubleValue(Value val);
 //transformacja mult vertex na algorytm ruskich chlopow
 InstructionVertex* transformMultVertex( InstructionVertex* & multVertex);
 
-std::vector<std::string> translateAssignVertex(InstructionVertex* & assignVertex);
+void translateAssignVertex(InstructionVertex* & assignVertex);
+//zwracamy pointer na jumpa
+Line* translateConditionalEdge(ConditionalEdge* edge)
+//zwracamy dispression end
+InstructionVertex* translateDispressionVertex(InstructionVertex* & dispressionVertex);
+
+
+//w callu procedury zostawiamy puste sety i uzupelniamy je w ostatniej fazie kompilacji
 
 #endif  
