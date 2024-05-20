@@ -3,11 +3,14 @@ Gebalang is programming language invented for the purpose of `Formal Languages a
 Lecture is taught by `dr. Maciej Gębala`. Compiler provides basic optimisation.
 For information about language see bottom of this file.
 
-## Compilation
-Compile using
+## Instalation
+Simply clone this repo and
 ```
 make all
 ```
+
+## Usage
+Compile using
 ```
 ./compiler <input_path> <compiled_path>
 ```
