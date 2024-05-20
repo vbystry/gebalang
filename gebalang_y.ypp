@@ -1,0 +1,640 @@
+%code requires{
+    #include <stdio.h>
+    #include <string.h>
+    #include <iostream>
+    #include <string>
+    #include <vector>
+    #include <memory>
+    #include <map>
+    #include <fstream> 
+    #include "utils.hpp"
+    #include "procedure.hpp"
+
+    extern int yylex();
+    extern FILE* yyin;
+    #define YYDEBUG 1
+}
+%code{
+    int yyerror (const char *s);
+    std::shared_ptr<InstructionVertex> programRoot;
+
+    std::shared_ptr<ParseTreeNode> program;
+
+}
+
+/* Bison declarations. */
+%define api.value.type {std::shared_ptr<ParseTreeNode>}
+%token NUM
+%token IDENTIFIER
+%token ASSIGN
+%token PROCEDURE
+%token IS
+%token VAR
+%token _BEGIN
+%token PROGRAM
+%token IF
+%token THEN
+%token ELSE
+%token ENDIF
+%token WHILE
+%token DO
+%token ENDWHILE
+%token REPEAT
+%token UNTIL
+%token READ
+%token SEMI
+%token WRITE
+%token END
+%token ERROR
+%token EQ
+%token GT
+%token GTE
+%token NEQ
+%token LT
+%token LTE
+%token PLUS
+%token MINUS
+%token DIV
+%token MULT
+%token MOD
+%token COMA
+%token OPEN_BRACKET
+%token CLOSE_BRACKET
+
+%left PLUS MINUS DIV MOD MULT
+
+%% /* The grammar follows. */
+program_all: procedures main
+{
+    std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+    token t=t_program_all;
+    node->childs.push_back($1);
+    node->childs.push_back($2);
+    program=node;
+    //std::cout << "koniec" << std::endl;
+}
+;
+
+procedures: procedures PROCEDURE proc_head IS VAR declarations _BEGIN commands END   
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_procedures;
+                node->tokens.push_back(t);
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                node->childs.push_back($6);
+                node->childs.push_back($7);
+                node->params.push_back("PROCEDURE");
+                node->params.push_back("IS VAR");
+                node->params.push_back("BEGIN");
+                node->params.push_back("END");
+
+                std::shared_ptr<ParseTreeNode> procedureNode = std::make_shared<ParseTreeNode>();
+                procedureNode->tokens.push_back(t);
+                procedureNode->childs.push_back($3);
+                procedureNode->childs.push_back($6);
+                procedureNode->childs.push_back($8);
+                procedureNode->params.push_back("PROCEDURE");
+                procedureNode->params.push_back("IS VAR");
+                procedureNode->params.push_back("BEGIN");
+                procedureNode->params.push_back("END");
+
+                Procedure procedure;
+                procedure.parseTree = procedureNode;
+                
+                
+
+                procedures.insert({procedureNode->childs[0]->childs[0]->params[0], procedure});
+                                procedureNamesInOrder.push_back(procedureNode->childs[0]->childs[0]->params[0]);
+
+                $$=node;
+            }
+            | procedures PROCEDURE proc_head IS _BEGIN commands END
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_procedures;
+                node->tokens.push_back(t);
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                node->childs.push_back($6);
+                node->params.push_back("PROCEDURE");
+                node->params.push_back("IS BEGIN");
+                node->params.push_back("END");
+                $$=node;
+
+                std::shared_ptr<ParseTreeNode> procedureNode = std::make_shared<ParseTreeNode>();
+                procedureNode->tokens.push_back(t);
+                procedureNode->childs.push_back($3);
+                procedureNode->childs.push_back($6);
+                
+                procedureNode->params.push_back("PROCEDURE");
+                procedureNode->params.push_back("BEGIN");
+                procedureNode->params.push_back("END");
+
+                Procedure procedure;
+                procedure.parseTree = procedureNode;
+                
+                
+
+                procedures.insert({procedureNode->childs[0]->childs[0]->params[0], procedure});
+                procedureNamesInOrder.push_back(procedureNode->childs[0]->childs[0]->params[0]);
+
+            }
+            |
+            {
+                $$=nullptr;
+            }
+            ;
+
+main: PROGRAM IS VAR declarations _BEGIN commands END
+    {
+        std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+        token t=t_main;
+        node->tokens.push_back(t);
+        node->childs.push_back($4);
+        node->childs.push_back($6);
+        node->params.push_back("PROGRAM");
+        node->params.push_back("IS VAR");
+        node->params.push_back("BEGIN");
+        node->params.push_back("END");
+        $$=node;
+    }
+     | PROGRAM IS _BEGIN commands END
+     {
+        std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+        token t=t_main;
+        node->tokens.push_back(t);
+        node->childs.push_back($4);
+        node->params.push_back("PROGRAM");
+        node->params.push_back("IS BEGIN");
+        node->params.push_back("END");
+        $$=node;
+
+        program=node;
+    }
+    ;
+
+commands: commands command
+        {
+            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_commands;
+            node->tokens.push_back(t);
+            node->childs.push_back($1);
+            node->childs.push_back($2);
+            $$=node;
+        }
+         | command
+        {
+            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_commands;
+            node->tokens.push_back(t);
+            node->childs.push_back($1);
+            $$=node;
+        }
+        ;
+
+command: IDENTIFIER ASSIGN expression SEMI
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_ASSIGN;
+                node->tokens.push_back(t);
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                node->params.push_back("ASSIGN");
+                $$=node; 
+            }
+         | IF condition THEN commands ELSE commands ENDIF
+        {
+            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_command;
+            node->tokens.push_back(t);
+            node->childs.push_back($2);
+            node->childs.push_back($4);
+            node->childs.push_back($6);
+            node->params.push_back("IF");
+            node->params.push_back("THEN");
+            node->params.push_back("ELSE");
+            node->params.push_back("ENDIF");
+            $$=node;
+        }
+         | IF condition THEN commands ENDIF
+        {
+            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_command;
+            node->tokens.push_back(t);
+            node->childs.push_back($2);
+            node->childs.push_back($4);
+            node->params.push_back("IF");
+            node->params.push_back("THEN");
+            node->params.push_back("ENDIF");
+            $$=node;
+        }
+         | WHILE condition DO commands ENDWHILE
+        {
+            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_command;
+            node->tokens.push_back(t);
+            node->childs.push_back($2);
+            node->childs.push_back($4);
+            node->params.push_back("WHILE");
+            node->params.push_back("DO");
+            node->params.push_back("ENDWHILE");
+            $$=node;
+        }
+         | REPEAT commands UNTIL condition SEMI
+        {
+            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_command;
+            node->tokens.push_back(t);
+            node->childs.push_back($2);
+            node->childs.push_back($4);
+            node->params.push_back("REPEAT");
+            node->params.push_back("UNTILL");
+            $$=node;
+        }
+         | proc_head SEMI
+        {
+            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_command;
+            node->tokens.push_back(t);
+            node->childs.push_back($1);
+            node->params.push_back("proc_head");
+            $$=node;
+        }
+         | READ IDENTIFIER SEMI
+        {
+            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_command;
+            node->tokens.push_back(t);
+            node->childs.push_back($2);
+            node->params.push_back("READ");
+            $$=node;
+            //std::cout << "comand" << std::endl;
+            //std::cout << node->childs[0]->params[0] << std::endl;
+        }
+         | WRITE value SEMI
+        {
+            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_command;
+            node->tokens.push_back(t);
+            node->childs.push_back($2);
+            node->params.push_back("WRITE");
+            $$=node;
+            //std::cout << "comand" << std::endl;
+        }
+        ;
+
+proc_head: IDENTIFIER OPEN_BRACKET declarations CLOSE_BRACKET
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_proc_head;
+                node->tokens.push_back(t);
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                $$=node;
+            }
+            ;
+
+declarations: declarations COMA IDENTIFIER
+                {
+                    std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                    token t=t_declarations;
+                    node->tokens.push_back(t);
+                    node->childs.push_back($1);
+                    node->childs.push_back($3);
+                    $$=node;
+                    //std::cout << "declarations" << std::endl;
+                }
+                 | IDENTIFIER
+                {
+                    std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                    token t=t_declarations;
+                    node->tokens.push_back(t);
+                    node->childs.push_back($1);
+                    $$=node;
+                    //std::cout << "declarations2" << std::endl;
+                }
+                ;
+
+expression: value
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_expression;
+                node->tokens.push_back(t);
+                node->childs.push_back($1);
+                node->params.push_back("NULL");
+                $$=node;
+                //std::cout << "expression" << std::endl;
+                
+            }
+             | value PLUS value
+            {
+                 //std::cout << "expression" << std::endl;
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_expression;
+                node->tokens.push_back(t);
+                node->params.push_back("PLUS");
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                $$=node;
+                //std::cout << "expression" << std::endl;
+                
+            }
+             | value MINUS value
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_expression;
+                node->tokens.push_back(t);
+                node->params.push_back("MINUS");
+                node->childs.push_back($1);
+                node->childs.push_back($3); 
+                $$=node;
+            }
+             | value MULT value
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_expression;
+                node->tokens.push_back(t);
+                node->params.push_back("MULT");
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                $$=node;
+            }
+             | value DIV value
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_expression;
+                node->tokens.push_back(t);
+                node->params.push_back("DIV");
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                $$=node;
+            }
+             | value MOD value
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_expression;
+                node->tokens.push_back(t);
+                node->params.push_back("MOD");
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                $$=node;
+            }
+            ;
+
+condition: value EQ value
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_condition;
+                node->tokens.push_back(t);
+                node->params.push_back("EQ");
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                $$=node;
+            }
+             | value NEQ value
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_condition;
+                node->tokens.push_back(t);
+                node->params.push_back("NEQ");
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                $$=node;
+            }
+             | value GT value
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_condition;
+                node->tokens.push_back(t);
+                node->params.push_back("GT");
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                $$=node;
+            }
+             | value LT value
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_condition;
+                node->tokens.push_back(t);
+                node->params.push_back("LT");
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                $$=node;
+            }
+             | value GTE value
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_condition;
+                node->tokens.push_back(t);
+                node->params.push_back("GTE");
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                //std::cout << "condition" << std::endl;
+                $$=node;
+            }
+             | value LTE value
+            {
+                std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                token t=t_condition; 
+                node->tokens.push_back(t);
+                node->params.push_back("LTE");
+                node->childs.push_back($1);
+                node->childs.push_back($3);
+                $$=node;
+            }
+            ;
+
+value: NUM
+        {
+            /*std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_num;
+            node->tokens.push_back(t)
+            node->params.push_back=$1
+            $$=node;*/
+
+            //$$=$1;
+
+            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_value;
+            node->tokens.push_back(t);
+            node->params.push_back("num");
+            node->childs.push_back($1);
+            $$=node;
+            //std::cout << "value" << node->childs[0]->params[0] << std::endl;
+        }
+         | IDENTIFIER
+        {
+            /*std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_identifier;
+            node->tokens.push_back(t)
+            node->params.push_back("identifier")
+            node->childs.push_back=$1
+            $$=node;*/
+
+            //$$=$1;
+            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+            token t=t_value;
+            node->tokens.push_back(t);
+            node->childs.push_back($1);
+            $$=node;
+            //std::cout << "value" << node->childs[0]->params[0] << std::endl;
+            
+        }
+        ;
+err: ERROR  {std::cout << "error\n";}
+;
+%%
+
+int yyerror(const char *s)
+{
+    std::cerr << s << "\n";	
+}
+int main(int argc, char *argv[])
+{
+    FILE* data;
+    data=fopen(argv[1], "r");
+    yyin=data;
+
+    freopen(argv[2],"w",stdout);
+
+    yyparse();
+    int mainJump;
+    jumps_no++;
+    mainJump=jumps_no;
+    std::shared_ptr<InstructionVertex> chartRoot =  buildFlowChart(program->childs[1]);
+    
+    if(strcmp(errorInfo.c_str(), ""))
+    {
+        std::cout << "elo";
+        yyerror(errorInfo.c_str());
+    }
+        
+    
+        
+    
+    code.push_back({"JUMP", mainJump});
+    //alloc
+    for(std::string procedureName : procedureNamesInOrder)
+    {
+        Procedure & p = procedures[procedureName];
+        p.flowChart = buildProcedureFlowChart(p);
+        if(strcmp(errorInfo.c_str(), ""))
+        {
+            std::cout << "elo";
+            yyerror(errorInfo.c_str());
+        }
+        std::shared_ptr<ProcedureInstructionVertex> activeVertex2 =  p.flowChart;
+        translateAllocVertex(activeVertex2, p);
+    }
+    translateAllocVertex(chartRoot);
+    chartRoot=chartRoot->edges[0].end;
+
+    for(std::string procedureName : procedureNamesInOrder)
+    {
+        Procedure & p = procedures[procedureName];
+        jumps_no++;
+        p.jumpNo = jumps_no;
+        std::shared_ptr<ProcedureInstructionVertex> chartRoot =  p.flowChart;
+        //std::cout << "po grafie\n";
+        std::shared_ptr<ProcedureInstructionVertex> activeVertex2 =  chartRoot;
+        //zaczynamu po assisg juz zaalokowane
+        activeVertex2=activeVertex2->edges[0].end;
+        jump_to_merge=p.jumpNo;
+        while(activeVertex2->instruction.operation != o_END)
+        {
+            //std::cout << activeVertex2->instruction.operation << std::endl;
+            switch(activeVertex2->instruction.operation)
+            {
+                case o_ALLOC:
+                    translateAllocVertex(activeVertex2, p);
+                    activeVertex2=activeVertex2->edges[0].end;
+                    break;
+                case o_ASSIGN:
+                    translateAssignVertex(activeVertex2, p);
+                    activeVertex2=activeVertex2->edges[0].end;
+                    break;
+                case o_WRITE:
+                    translateWriteVertex(activeVertex2, p);
+                    activeVertex2=activeVertex2->edges[0].end;
+                    break;
+                case o_READ:
+                    translateReadVertex(activeVertex2, p);
+                    activeVertex2=activeVertex2->edges[0].end;
+                    break;
+                case o_DISPRESSION_BEGIN:
+                    activeVertex2=translateDispressionVertex(activeVertex2, p);
+                    break;
+                case o_CALL_PROC:
+                    transalteProcedureVertex(activeVertex2, p);
+                    activeVertex2 = activeVertex2->edges[0].end;
+                    break;
+                case o_OP_NULL:
+                    activeVertex2=activeVertex2->edges[0].end;
+                    break;
+                
+                    //error
+            }
+            
+        }
+        
+        codePushBack("JUMPI " + std::to_string(p.retAdd));
+        if(jump_to_merge)
+        {
+            Line & jumpi = code.back();
+            jumpi.jump_jump_number=jump_to_merge;
+            jump_to_merge=0;
+        }
+    }
+    
+    std::shared_ptr<InstructionVertex> activeVertex =  chartRoot;
+    jump_to_merge=mainJump;
+    while(activeVertex->instruction.operation != o_END)
+    {
+        switch(activeVertex->instruction.operation)
+        {
+            case o_ALLOC:
+                translateAllocVertex(activeVertex);
+                activeVertex=activeVertex->edges[0].end;
+                break;
+            case o_ASSIGN:
+                translateAssignVertex(activeVertex);
+                activeVertex=activeVertex->edges[0].end;
+                break;
+            case o_WRITE:
+                translateWriteVertex(activeVertex);
+                activeVertex=activeVertex->edges[0].end;
+                break;
+            case o_READ:
+                translateReadVertex(activeVertex);
+                activeVertex=activeVertex->edges[0].end;
+                break;
+            case o_CALL_PROC:
+                transalteProcedureVertex(activeVertex);
+                activeVertex = activeVertex->edges[0].end;
+                break;
+            case o_DISPRESSION_BEGIN:
+                activeVertex=translateDispressionVertex(activeVertex);
+                break;
+            case o_OP_NULL:
+                activeVertex=activeVertex->edges[0].end;
+                break;
+            
+                //error
+        }
+        
+    }
+    Line line;
+    line.instruction="HALT";
+    line.jump_number=jump_to_merge;
+
+    code.push_back(line);
+
+    ////std::cout << "jestesmy daleko\n";
+
+    jumpMerge();
+
+    for(Line line : code)
+        std::cout << line.instruction << std::endl;
+
+}

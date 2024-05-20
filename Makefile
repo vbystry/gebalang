@@ -1,12 +1,12 @@
-FLAGS = -W -O3
+FLAGS1 = -std=c++2a -o
 .PHONY = all clean cleanall
 
 all: gebalang
 
-gebalang: gebalang_y.y gebalang_l.l
-	bison -o yacc.cpp -d gebalang_y.y
+gebalang: gebalang_y.ypp gebalang_l.l utils.cpp procedure.cpp 
+	bison -o yacc.cpp -d gebalang_y.ypp
 	flex -o lexer.cpp gebalang_l.l
-	$(CC++) $(FLAGS) -o gebalang yacc.cpp lexer.cpp
+	g++ -g -std=c++2a -o compiler lexer.cpp yacc.cpp utils.cpp procedure.cpp
 	
 clean:
 	rm -f build/*.cpp build/*.hpp build/*.o

@@ -1,22 +1,23 @@
+%option noyywrap
 %option yylineno
 %{
-#include "gebalang_y.hpp"
-#include <stdlib.h>
-int yylex();
+//#define YYSTYPE std::shared_ptr<ParseTreeNode>
+#include <stdio.h>
+#include <string.h>
+#include <string>
+#include <vector>
+#include <memory>
+#include "utils.hpp"
+#include "yacc.hpp"
 %}
+%x COMMENT
 %%
-
-%x WORD
-%x WHITESPACE
-%x BLOCK_COMMENT
-
-%%
-
-"PROGRAM"  { return PROGRAM; }
+\[   BEGIN(COMMENT);
+"PROGRAM"  {return PROGRAM; }
 "PROCEDURE" { return PROCEDURE; }
 "IS"   { return IS; }
-"VAR"  { return VAR; }
-"BEGIN"    { return _BEGIN; }
+"VAR"     { return VAR; }
+"BEGIN"    {return _BEGIN; }
 "END"  { return END; }
 "IF"   { return IF; }
 "THEN" { return THEN; }
@@ -42,27 +43,36 @@ int yylex();
 "<"    { return LT; }
 ">="   { return GTE; }
 "<="   { return LTE; }
+","     {return COMA;}
+"("     {return OPEN_BRACKET;}
+")"     {return CLOSE_BRACKET;}
 
-
-"0|[1-9][0-9]*"     { 
-                        parseTreeNode* node;
-                        token t=num;
-                        (node->tokens)::insert(t);
-                        (node->params)::insert(yytext);
-                        yylval=node; return num; 
+0|[1-9][0-9]*     { 
+                        std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                        token t=t_num; 
+                        node->tokens.push_back(t);
+                        node->params.push_back(yytext);
+                        yylval=node; return NUM; 
                     }
-[a-zA-Z][a-zA-Z0-9]*    { 
-                            parseTreeNode* node;
-                            token t=identifier;
-                            (node->tokens)::insert(t);
-                            (node->params)::insert(yytext);
-                            yylval=node; return NUM; 
+[_a-z]+                 { 
+                            std::shared_ptr<ParseTreeNode> node = std::make_shared<ParseTreeNode>();
+                            token t=t_identifier;
+                            node->tokens.push_back(t);
+                            node->params.push_back(yytext);
+                            //std::cout << "returnED IDENTIFIER " << yytext << std::endl;
+
+                            yylval=node; return IDENTIFIER; 
                         }
 
 [ \t\n]   { }
 
 [ \t]+ 	;
 
-\n	{ return END; }
-.   return ERROR;
+.    {std::cout << yytext << " error2\n";return ERROR;}
+
+<COMMENT>{
+    \] BEGIN(INITIAL);
+    \n
+    .
+}
 %%

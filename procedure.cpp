@@ -12,23 +12,9 @@
 #include <math.h>
 
 #include "utils.hpp"
-#include "yacc.hpp"
+#include "procedure.hpp"
 
-std::vector<Line> code;
-std::string errorInfo;
-
-std::map<std::string, Value> variables;
-std::vector<std::string> procedureNamesInOrder;
-
-int jumps_no;
-
-int jump_to_merge = 0;
-
-int freeMem = 1;
-
-std::map<std::string, Procedure> procedures;
-
-void neqCond(Condition & cond)
+void neqCond(ProcedureCondition & cond)
 {
     switch (cond.comparission)
     {
@@ -59,52 +45,38 @@ void neqCond(Condition & cond)
     }
 }
 
-Value NULL_VALUE()
+ProcedureValue PROCEDURE_NULL_VALUE()
 {
-    Value v;
+    ProcedureValue v;
     v.adress = -1;
     v.value = -1;
     return v;
 }
 
-Condition TRUE_CONDITION()
+ProcedureCondition PROCEDURE_TRUE_CONDITION()
 {
-    Condition c;
+    ProcedureCondition c;
     c.comparission = c_true;
     return c;
 }
 
-Edge NON_COND_EDGE(std::shared_ptr<InstructionVertex> end)
+ProcedureEdge PROCEDURE_NON_COND_EDGE(std::shared_ptr<ProcedureInstructionVertex> end)
 {
-    Edge e;
-    e.condition = TRUE_CONDITION();
+    ProcedureEdge e;
+    e.condition = PROCEDURE_TRUE_CONDITION();
     e.end = end;
     return e;
 }
 
-std::string readValue(std::shared_ptr<ParseTreeNode> &valueNode)
+
+std::string procedureReadValue(std::shared_ptr<ParseTreeNode> &valueNode)
 {
+    // Value value;
     std::string value;
-    std::string i = std::to_string(freeMem);
-     Value val;
     switch (valueNode->childs[0]->tokens[0])
     {
     case t_num:
-        //alloc const
-
-         
-        if(!variables.contains(valueNode->childs[0]->params[0]))
-        {
-            val.adress=freeMem;
-        val.name=valueNode->childs[0]->params[0];
-        variables.insert({valueNode->childs[0]->params[0], val});
-        freeMem++;
-        codePushBack("SET " + valueNode->childs[0]->params[0]);
-        codePushBack("STORE " + i);
-        }
-        
-        
-        value ="@" + valueNode->childs[0]->params[0];
+        value = valueNode->childs[0]->params[0];
         break;
     case t_identifier:
         value = "@" + valueNode->childs[0]->params[0];
@@ -116,9 +88,11 @@ std::string readValue(std::shared_ptr<ParseTreeNode> &valueNode)
     return value;
 }
 
-Expression readExpression(std::shared_ptr<ParseTreeNode> &expressionTree)
+
+ProcedureExpression procedureReadExpression(std::shared_ptr<ParseTreeNode> &expressionTree)
 {
-    Expression expr;
+    // check if node is
+    ProcedureExpression expr;
     if (!std::strcmp(expressionTree->params[0].c_str(), "NULL"))
         expr.op = o_null;
     else if (!std::strcmp(expressionTree->params[0].c_str(), "PLUS"))
@@ -132,16 +106,19 @@ Expression readExpression(std::shared_ptr<ParseTreeNode> &expressionTree)
     else if (!std::strcmp(expressionTree->params[0].c_str(), "MOD"))
         expr.op = o_mod;
 
-        expr.values.push_back(readValue(expressionTree->childs[0]));
+    // readValues
+    expr.values.push_back(procedureReadValue(expressionTree->childs[0]));
     if (expr.op != o_null)
-        expr.values.push_back(readValue(expressionTree->childs[1]));
+        expr.values.push_back(procedureReadValue(expressionTree->childs[1]));
 
     return expr;
 }
 
-Condition readCondition(std::shared_ptr<ParseTreeNode> &conditionTree)
+ProcedureCondition procedureReadCondition(std::shared_ptr<ParseTreeNode> &conditionTree)
 {
-    Condition cond;
+    // check if node is condition
+
+    ProcedureCondition cond;
 
     if (!std::strcmp(conditionTree->params[0].c_str(), "EQ"))
         cond.comparission = eq;
@@ -156,16 +133,18 @@ Condition readCondition(std::shared_ptr<ParseTreeNode> &conditionTree)
     else if (!std::strcmp(conditionTree->params[0].c_str(), "LTE"))
         cond.comparission = lte;
 
-    cond.values[0] = readValue(conditionTree->childs[0]);
-    cond.values[1] = readValue(conditionTree->childs[1]);
+    // readValues
+    cond.values[0] = procedureReadValue(conditionTree->childs[0]);
+    cond.values[1] = procedureReadValue(conditionTree->childs[1]);
 
     return cond;
 }
 
-std::shared_ptr<InstructionVertex> buildCommandFlowChart(std::shared_ptr<ParseTreeNode> &commandTree, std::shared_ptr<InstructionVertex> &beginVertex, std::shared_ptr<InstructionVertex> &endVertex)
+
+std::shared_ptr<ProcedureInstructionVertex> buildProcedureCommandFlowChart(std::shared_ptr<ParseTreeNode> &commandTree, std::shared_ptr<ProcedureInstructionVertex> &beginVertex, std::shared_ptr<ProcedureInstructionVertex> &endVertex)
 {
-    std::shared_ptr<InstructionVertex> commandRoot = std::make_shared<InstructionVertex>();
-    beginVertex->edges.push_back(NON_COND_EDGE(commandRoot));
+    std::shared_ptr<ProcedureInstructionVertex> commandRoot = std::make_shared<ProcedureInstructionVertex>();
+    beginVertex->edges.push_back(PROCEDURE_NON_COND_EDGE(commandRoot));
 
     if (!std::strcmp(commandTree->params[0].c_str(), "ASSIGN"))
     {
@@ -174,74 +153,79 @@ std::shared_ptr<InstructionVertex> buildCommandFlowChart(std::shared_ptr<ParseTr
         std::string variableName = commandTree->childs[0]->params[0];
         commandRoot->instruction.values.push_back("@" + variableName);
 
-        commandRoot->instruction.expression = readExpression(commandTree->childs[1]);
+        commandRoot->instruction.expression = procedureReadExpression(commandTree->childs[1]);
         commandRoot->begin = (beginVertex->begin + beginVertex->code.size());
-
-        commandRoot->edges.push_back(NON_COND_EDGE(endVertex));
+        // std::vector<std::string> codeToAppend=translateAssignVertex(commandRoot);
+        // commandRoot->code//dodac code to aapend
+        commandRoot->edges.push_back(PROCEDURE_NON_COND_EDGE(endVertex));
         endVertex->begin = (commandRoot->begin + commandRoot->code.size());
     }
     else if (!std::strcmp(commandTree->params[0].c_str(), "IF"))
     {
-        Condition cond1 = readCondition(commandTree->childs[0]);
+        ProcedureCondition cond1 = procedureReadCondition(commandTree->childs[0]);
         commandRoot->instruction.operation = o_DISPRESSION_BEGIN;
 
-        std::shared_ptr<InstructionVertex> ifEndVertex = std::make_shared<InstructionVertex>();
+        std::shared_ptr<ProcedureInstructionVertex> ifEndVertex = std::make_shared<ProcedureInstructionVertex>();
         ifEndVertex->instruction.operation = o_DISPRESSION_END;
 
-        ifEndVertex->edges.push_back(NON_COND_EDGE(endVertex));
+        ifEndVertex->edges.push_back(PROCEDURE_NON_COND_EDGE(endVertex));
 
-        Edge edge1;
+        // end of first edge is chart of commands after then statement
+        ProcedureEdge edge1;
         edge1.condition = cond1;
-        edge1.end = buildCommandsFlowChart(commandTree->childs[1], ifEndVertex);
+        edge1.end = buildProcedureCommandsFlowChart(commandTree->childs[1], ifEndVertex);
         commandRoot->edges.push_back(edge1);
 
+        // if statement is if then else
         if (!(std::strcmp(commandTree->params[2].c_str(), "ELSE")))
-            commandRoot->edges.push_back(NON_COND_EDGE(buildCommandsFlowChart(commandTree->childs[2], ifEndVertex)));
+            commandRoot->edges.push_back(PROCEDURE_NON_COND_EDGE(buildProcedureCommandsFlowChart(commandTree->childs[2], ifEndVertex)));
         else
-            commandRoot->edges.push_back(NON_COND_EDGE(ifEndVertex));
+            commandRoot->edges.push_back(PROCEDURE_NON_COND_EDGE(ifEndVertex));
     }
     else if (!std::strcmp(commandTree->params[0].c_str(), "WHILE"))
     {
-        Condition cond1 = readCondition(commandTree->childs[0]);
+        ProcedureCondition cond1 = procedureReadCondition(commandTree->childs[0]);
         commandRoot->instruction.operation = o_DISPRESSION_BEGIN;
 
-        std::shared_ptr<InstructionVertex> whileEndVertex = std::make_shared<InstructionVertex>();
-        ConditionalEdge edge1;
+        std::shared_ptr<ProcedureInstructionVertex> whileEndVertex = std::make_shared<ProcedureInstructionVertex>();
+        // end of first edge is chart of commands after then statement
+        ProcedureConditionalEdge edge1;
         edge1.condition = cond1;
 
-        edge1.end = buildCommandsFlowChart(commandTree->childs[1], whileEndVertex);
+        edge1.end = buildProcedureCommandsFlowChart(commandTree->childs[1], whileEndVertex);
         commandRoot->edges.push_back(edge1);
 
-        ConditionalEdge edge2;
+        ProcedureEdge edge2;
         edge2.condition = cond1;
         edge2.end = commandRoot;
         whileEndVertex->instruction.operation = o_DISPRESSION_END;
         whileEndVertex->edges.push_back(edge2);
-        whileEndVertex->edges.push_back(NON_COND_EDGE(endVertex));
+        whileEndVertex->edges.push_back(PROCEDURE_NON_COND_EDGE(endVertex));
 
-        commandRoot->edges.push_back(NON_COND_EDGE(whileEndVertex));
+        commandRoot->edges.push_back(PROCEDURE_NON_COND_EDGE(whileEndVertex));
     }
     else if (!std::strcmp(commandTree->params[0].c_str(), "REPEAT"))
     {
-        Condition cond1 = readCondition(commandTree->childs[1]);
+        ProcedureCondition cond1 = procedureReadCondition(commandTree->childs[1]);
         commandRoot->instruction.operation = o_DISPRESSION_BEGIN;
-        std::shared_ptr<InstructionVertex> untillVertex = std::make_shared<InstructionVertex>();
-        ;//tu jest cos nie tak
+        std::shared_ptr<ProcedureInstructionVertex> untillVertex = std::make_shared<ProcedureInstructionVertex>();
+        ;
         untillVertex->instruction.operation = o_DISPRESSION_END;
-        ConditionalEdge edge1;
+        ProcedureConditionalEdge edge1;
         neqCond(cond1);
         edge1.condition = cond1;
         edge1.end = commandRoot;
         
         untillVertex->edges.push_back(edge1);
 
-        commandRoot->edges.push_back(NON_COND_EDGE(buildCommandsFlowChart(commandTree->childs[0], untillVertex)));
+        commandRoot->edges.push_back(PROCEDURE_NON_COND_EDGE(buildProcedureCommandsFlowChart(commandTree->childs[0], untillVertex)));
 
-        untillVertex->edges.push_back(NON_COND_EDGE(endVertex));
+        // end of first edge is chart of commands after then statement
+        untillVertex->edges.push_back(PROCEDURE_NON_COND_EDGE(endVertex));
     }
     else if (!std::strcmp(commandTree->params[0].c_str(), "proc_head"))
     {
-        std::shared_ptr<InstructionVertex> untillVertex = std::make_shared<InstructionVertex>();
+        std::shared_ptr<ProcedureInstructionVertex> untillVertex = std::make_shared<ProcedureInstructionVertex>();
         commandRoot->instruction.operation=o_CALL_PROC;
         commandRoot->instruction.values;
 
@@ -254,7 +238,7 @@ std::shared_ptr<InstructionVertex> buildCommandFlowChart(std::shared_ptr<ParseTr
             declarations = declarations->childs[0];
         }
         commandRoot->instruction.values.push_back(declarations->childs[0]->params[0]);
-        commandRoot->edges.push_back(NON_COND_EDGE(endVertex));
+        commandRoot->edges.push_back(PROCEDURE_NON_COND_EDGE(endVertex));
     }
     else if (!std::strcmp(commandTree->params[0].c_str(), "READ"))
     {
@@ -262,121 +246,167 @@ std::shared_ptr<InstructionVertex> buildCommandFlowChart(std::shared_ptr<ParseTr
         // error jesli zmienna niezadeklarowana
         std::string variableName = commandTree->childs[0]->params[0];
         commandRoot->instruction.values.push_back("@" + variableName);
-        commandRoot->edges.push_back(NON_COND_EDGE(endVertex));
+        commandRoot->edges.push_back(PROCEDURE_NON_COND_EDGE(endVertex));
     }
     else if (!std::strcmp(commandTree->params[0].c_str(), "WRITE"))
     {
         commandRoot->instruction.operation = o_WRITE;
-        commandRoot->instruction.values.push_back(readValue(commandTree->childs[0]));
-        commandRoot->edges.push_back(NON_COND_EDGE(endVertex));
+        commandRoot->instruction.values.push_back(procedureReadValue(commandTree->childs[0]));
+        commandRoot->edges.push_back(PROCEDURE_NON_COND_EDGE(endVertex));
     }
-
     return commandRoot;
 }
 
-std::shared_ptr<InstructionVertex> buildCommandsFlowChart(std::shared_ptr<ParseTreeNode> &commandsTree, std::shared_ptr<InstructionVertex> &endVertex)
+std::shared_ptr<ProcedureInstructionVertex> buildProcedureCommandsFlowChart(std::shared_ptr<ParseTreeNode> &commandsTree, std::shared_ptr<ProcedureInstructionVertex> &endVertex)
 {
-    std::shared_ptr<InstructionVertex> commandsRoot = std::make_shared<InstructionVertex>();
+    std::shared_ptr<ProcedureInstructionVertex> commandsRoot = std::make_shared<ProcedureInstructionVertex>();
 
     if (commandsTree->childs.size() == 1)
     {
-        return buildCommandFlowChart(commandsTree->childs[0], commandsRoot, endVertex);
+        return buildProcedureCommandFlowChart(commandsTree->childs[0], commandsRoot, endVertex);
     }
     else
     {
         // command chart ma dwoch ojcow, deadcodevertex i commandvertexlast
-        std::shared_ptr<InstructionVertex> deadCodeVertex = std::make_shared<InstructionVertex>();
+        std::shared_ptr<ProcedureInstructionVertex> deadCodeVertex = std::make_shared<ProcedureInstructionVertex>();
         deadCodeVertex->instruction.operation = o_OP_NULL;
-        std::shared_ptr<InstructionVertex> commandVertex = buildCommandFlowChart(commandsTree->childs[1], deadCodeVertex, endVertex);
-        return buildCommandsFlowChart(commandsTree->childs[0], commandsRoot, commandVertex);
+        std::shared_ptr<ProcedureInstructionVertex> commandVertex = buildProcedureCommandFlowChart(commandsTree->childs[1], deadCodeVertex, endVertex);
+        return buildProcedureCommandsFlowChart(commandsTree->childs[0], commandsRoot, commandVertex);
     }
 }
 
-std::shared_ptr<InstructionVertex> buildCommandsFlowChart(std::shared_ptr<ParseTreeNode> &commandsTree, std::shared_ptr<InstructionVertex> &beginVertex, std::shared_ptr<InstructionVertex> &endVertex)
+std::shared_ptr<ProcedureInstructionVertex> buildProcedureCommandsFlowChart(std::shared_ptr<ParseTreeNode> &commandsTree, std::shared_ptr<ProcedureInstructionVertex> &beginVertex, std::shared_ptr<ProcedureInstructionVertex> &endVertex)
 {
-    std::shared_ptr<InstructionVertex> commandsRoot = std::make_shared<InstructionVertex>();
+    std::shared_ptr<ProcedureInstructionVertex> commandsRoot = std::make_shared<ProcedureInstructionVertex>();
 
     if (commandsTree->childs.size() == 1)
     {
-        return buildCommandFlowChart(commandsTree->childs[0], beginVertex, endVertex);
+        return buildProcedureCommandFlowChart(commandsTree->childs[0], beginVertex, endVertex);
     }
     else
     {
         // command chart ma dwoch ojcow, deadcodevertex i commandvertexlast
-        std::shared_ptr<InstructionVertex> deadCodeVertex = std::make_shared<InstructionVertex>();
+        std::shared_ptr<ProcedureInstructionVertex> deadCodeVertex = std::make_shared<ProcedureInstructionVertex>();
         deadCodeVertex->instruction.operation = o_OP_NULL;
-        std::shared_ptr<InstructionVertex> commandVertex = buildCommandFlowChart(commandsTree->childs[1], deadCodeVertex, endVertex);
-        return buildCommandsFlowChart(commandsTree->childs[0], beginVertex, commandVertex);
+        std::shared_ptr<ProcedureInstructionVertex> commandVertex = buildProcedureCommandFlowChart(commandsTree->childs[1], deadCodeVertex, endVertex);
+        return buildProcedureCommandsFlowChart(commandsTree->childs[0], beginVertex, commandVertex);
     }
 }
 
-std::shared_ptr<InstructionVertex> buildFlowChart(std::shared_ptr<ParseTreeNode> programTree)
+std::shared_ptr<ProcedureInstructionVertex> buildProcedureFlowChart(Procedure & procedure)
 {
-    std::shared_ptr<InstructionVertex> programRoot = std::make_shared<InstructionVertex>();
-    if (!programTree->params[1].compare("IS VAR"))
-    {
-        std::vector<Value> values;
-        std::shared_ptr<ParseTreeNode> declarations = programTree->childs[0];
-        while (declarations->childs.size() > 1)
+    std::shared_ptr<ParseTreeNode> procedureTree = procedure.parseTree;
+    std::shared_ptr<ProcedureInstructionVertex> programRoot = std::make_shared<ProcedureInstructionVertex>();
+    //deklaracja zmiennych referowanych
+    std::shared_ptr<ParseTreeNode> proc_head = procedureTree->childs[0];
+    //deklaracje zmiennych referowanych
+    std::shared_ptr<ParseTreeNode> declarations = proc_head->childs[1];
+    std::vector<ProcedureValue> values;
+    int refNo=0;
+    while (declarations->childs.size() > 1)
         {
-            Value val;
+            ProcedureValue val;
             val.name = declarations->childs[1]->params[0];
-            if(variables.contains(declarations->childs[1]->params[0]))
+            val.indirectPostfix="I ";
+            val.refNo=refNo;
+            refNo++;
+            if(procedure.variables.contains(declarations->childs[1]->params[0]))
             {
                 errorInfo = "Multiple declaration of variable: " + declarations->childs[1]->params[0];
                 
             }
-            variables.insert({declarations->childs[1]->params[0], val});
+            procedure.variables.insert({declarations->childs[1]->params[0], val});
             values.push_back(val);
             declarations = declarations->childs[0];
         }
-        Value val;
-        val.name = declarations->childs[0]->params[0];
-        if(variables.contains(declarations->childs[0]->params[0]))
-        {
-            errorInfo = "Multiple declaration of variable: " + declarations->childs[0]->params[0];
-            
+    ProcedureValue val;
+    val.name = declarations->childs[0]->params[0];
+    val.indirectPostfix="I ";
+    val.refNo=refNo;
+            refNo++;
+    if(procedure.variables.contains(declarations->childs[0]->params[0]))
+    {
+        errorInfo = "Multiple declaration of variable: " + declarations->childs[1]->params[0];
+        
+    }        
+    procedure.variables.insert({declarations->childs[0]->params[0], val});
+    values.push_back(val);
 
+    programRoot->instruction.operation = o_ALLOC;
+
+    int commandsNo=1;
+    
+
+
+
+    if (!procedureTree->params[1].compare("IS VAR"))
+    {
+        commandsNo=2;
+        // zadeklaruj zmienne
+        //deklaracje nieref
+        declarations = procedureTree->childs[1];
+        while (declarations->childs.size() > 1)
+        {
+            ProcedureValue val;
+            val.name = declarations->childs[1]->params[0];
+            val.indirectPostfix=" ";
+            if(procedure.variables.contains(declarations->childs[1]->params[0]))
+            {
+                errorInfo = "Multiple declaration of variable: " + declarations->childs[1]->params[0];
+                
+            }
+            procedure.variables.insert({declarations->childs[1]->params[0], val});
+            values.push_back(val);
+            declarations = declarations->childs[0];
         }
-        variables.insert({declarations->childs[0]->params[0], val});
+        ProcedureValue val;
+        val.name = declarations->childs[0]->params[0];
+        val.indirectPostfix=" ";
+        if(procedure.variables.contains(declarations->childs[0]->params[0]))
+        {
+            errorInfo = "Multiple declaration of variable: " + declarations->childs[1]->params[0];
+            
+        }   
+        procedure.variables.insert({declarations->childs[0]->params[0], val});
+
         values.push_back(val);
 
         programRoot->instruction.operation = o_ALLOC;
-
-
-
-        for (int i = 0; i < values.size(); i++)
-            programRoot->instruction.values.push_back("@" + values[i].name);
     }
-    else
-        programRoot->instruction.operation = o_OP_NULL;
+    
 
-    std::shared_ptr<InstructionVertex> programEnd = std::make_shared<InstructionVertex>();
+    for (int i = 0; i < values.size(); i++)
+            programRoot->instruction.values.push_back("@" + values[i].name);
+
+    std::shared_ptr<ProcedureInstructionVertex> programEnd = std::make_shared<ProcedureInstructionVertex>();
     programEnd->instruction.operation = o_END;
-    programRoot->edges.push_back(NON_COND_EDGE(buildCommandsFlowChart(
-        programTree->childs[1], programRoot, programEnd)));
+    programRoot->edges.push_back(PROCEDURE_NON_COND_EDGE(buildProcedureCommandsFlowChart(
+        procedureTree->childs[commandsNo], programRoot, programEnd)));
 
     return programRoot;
 }
 
-void addValues(Value val1, Value val2)
+
+void addValues(ProcedureValue val1, ProcedureValue val2)
 {
+    // if val1 is variable
     std::string i;
     if (val1.adress > -1)
     {
+        // if val2 is variable
         if (val2.adress > -1)
         {
             i = std::to_string(val1.adress);
-            codePushBack("LOAD " + i);
+            codePushBack("LOAD" + val1.indirectPostfix + i);
             i = std::to_string(val2.adress);
-            code.push_back({"ADD " + i, 0});
+            code.push_back({"ADD"+ val2.indirectPostfix + i, 0});
         }
         else
         {
             i = std::to_string(val2.value);
             codePushBack("SET " + i);
             i = std::to_string(val1.adress);
-            code.push_back({"ADD " + i, 0});
+            code.push_back({"ADD" + val1.indirectPostfix+ i, 0});
         }
     }
     else
@@ -384,9 +414,9 @@ void addValues(Value val1, Value val2)
         if (val2.adress > -1)
         {
             i = std::to_string(val1.value);
-            codePushBack("SET " + i);
+            codePushBack("SET "  + val1.indirectPostfix + i);
             i = std::to_string(val2.adress);
-            code.push_back({"ADD " + i, 0});
+            code.push_back({"ADD"  + val2.indirectPostfix + i, 0});
         }
         else
         {
@@ -396,27 +426,29 @@ void addValues(Value val1, Value val2)
     }
 }
 
-void subValues(Value val1, Value val2)
+void subValues(ProcedureValue val1, ProcedureValue val2)
 {
 
     std::string i;
+    // if val1 is variable
     if (val1.adress > -1)
     {
+        // if val2 is variable
         if (val2.adress > -1)
         {
             i = std::to_string(val1.adress);
-            codePushBack("LOAD " + i);
+            codePushBack("LOAD" + val1.indirectPostfix + i);
             i = std::to_string(val2.adress);
-            code.push_back({"SUB " + i, 0});
+            code.push_back({"SUB" + val2.indirectPostfix + i, 0});
         }
         else
         {
             i = std::to_string(val2.value);
-            codePushBack("SET " + i);
+            codePushBack("SET " + val2.indirectPostfix + i);
             i = std::to_string(freeMem);
             code.push_back({"STORE " + i, 0});
             i = std::to_string(val1.adress);
-            code.push_back({"LOAD " + i, 0});
+            code.push_back({"LOAD" + val1.indirectPostfix + i, 0});
             i = std::to_string(freeMem);
             code.push_back({"SUB " + i, 0});
         }
@@ -428,31 +460,32 @@ void subValues(Value val1, Value val2)
             i = std::to_string(val1.value);
             codePushBack("SET " + i);
             i = std::to_string(val2.adress);
-            code.push_back({"SUB " + i, 0});
+            code.push_back({"SUB" + val2.indirectPostfix + i, 0});
         }
         else
         {
+            // do opt predictable wystarczy wchodzic tu gdy valeus sa >-1 (done)
             i = std::to_string(fmax(val1.value - val2.value, 0));
             codePushBack("SET " + i);
         }
     }
 }
 
-void doubleValue(Value val)
+void doubleValue(ProcedureValue val)
 {
-   
     std::string i;
-   
+
     addValues(val, val);
 }
 
-void halfValue(Value val)
+void halfValue(ProcedureValue val)
 {
     std::string i;
+    // if val is variable
     if (val.adress > -1)
     {
         i = std::to_string(val.adress);
-        codePushBack("LOAD " + i);
+        codePushBack("LOAD"  + val.indirectPostfix + i);
         code.push_back({"HALF", 0});
     }
     else
@@ -464,24 +497,43 @@ void halfValue(Value val)
     code;
 }
 
-void translateReadVertex(std::shared_ptr<InstructionVertex> &readVertex)
+void translateReadVertex(std::shared_ptr<ProcedureInstructionVertex> &readVertex, Procedure procedure)
 {
-    // zmienic value na upredictable
-    std::string i = std::to_string(readVertex->instruction.getValue(0).adress);
-    codePushBack("GET " + i);
+    ProcedureValue val= readVertex->instruction.getValue(0, procedure);
+    std::string i = val.indirectPostfix + std::to_string( val.adress);
+    if(val.refNo>-1)
+    {
+        
+        i = std::to_string(freeMem);
+        codePushBack("GET" + i);
+        codePushBack("LOAD " + i);
+        std::string i = std::to_string(val.adress);
+        codePushBack("STOREI " + i);
+    }
+    else
+        codePushBack("GET" + i);
 }
 
-void translateWriteVertex(std::shared_ptr<InstructionVertex> &readVertex)
+void translateWriteVertex(std::shared_ptr<ProcedureInstructionVertex> &readVertex, Procedure procedure)
 {
-    int adress = readVertex->instruction.getValue(0).adress;
-    if (adress > -1)
+    ProcedureValue val= readVertex->instruction.getValue(0, procedure);
+    int adress =val.adress;
+    if(val.refNo>-1)
     {
         std::string i = std::to_string(adress);
+        codePushBack("LOADI " + i);
+        i = std::to_string(freeMem);
+        codePushBack("STORE " + i);
         codePushBack("PUT " + i);
+    }
+    else if (adress > -1)
+    {
+        std::string i =val.indirectPostfix+ std::to_string(adress);
+        codePushBack("PUT" + i);
     }
     else
     {
-        int value = readVertex->instruction.getValue(0).value;
+        int value = val.value;
         std::string i = std::to_string(value);
         codePushBack("SET " + i);
         i = std::to_string(freeMem);
@@ -490,22 +542,40 @@ void translateWriteVertex(std::shared_ptr<InstructionVertex> &readVertex)
     }
 }
 
-void translateAllocVertex(std::shared_ptr<InstructionVertex> &allocVertex)
+void translateAllocVertex(std::shared_ptr<ProcedureInstructionVertex> &allocVertex, Procedure & procedure)
 {
+    procedure.retAdd=freeMem;
+    freeMem++;
     for (std::string v : allocVertex->instruction.values)
     {
-        variables[v.substr(1, v.size() - 1)].adress = freeMem;
-        freeMem++;
+        ProcedureValue & val =procedure.variables[v.substr(1, v.size() - 1)];
+        if(val.refNo>-1)
+        {
+            //pop do zmiany kolejnosci
+            procedure.refVariables.push_back(v.substr(1, v.size() - 1));
+            val.adress = freeMem;
+            freeMem++;
+        }
+        
+    }
+    for (std::string v : allocVertex->instruction.values)
+    {
+        ProcedureValue & val =procedure.variables[v.substr(1, v.size() - 1)];
+        if(val.refNo==-1)
+        {
+            val.adress = freeMem;
+            freeMem++;
+        }
+        
     }
 }
 
-void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
+void translateAssignVertex(std::shared_ptr<ProcedureInstructionVertex> &assignVertex, Procedure procedure)
 {
-    Value v1 = assignVertex->instruction.expression.getValue(0);
-
-    Value v2;
+    ProcedureValue v1 = assignVertex->instruction.expression.getValue(0, procedure);
+    ProcedureValue v2;
     if(assignVertex->instruction.expression.values.size()>1)
-     v2= assignVertex->instruction.expression.getValue(1);
+        v2= assignVertex->instruction.expression.getValue(1, procedure);
 
     std::string i;
     int jmp1;
@@ -514,41 +584,47 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
     int jmp4;
     int jmp5;
     int jmp6;
-
+    ProcedureValue val;
     switch (assignVertex->instruction.expression.op)
     {
     case o_null:
 
-        if (assignVertex->instruction.expression.getValue(0).adress > -1)
+        if (assignVertex->instruction.expression.getValue(0, procedure).adress > -1)
         {
             // assign variable
-            i = std::to_string(assignVertex->instruction.expression.getValue(0).adress);
-            codePushBack("LOAD " + i);
+            val = assignVertex->instruction.expression.getValue(0, procedure);
+            i =val.indirectPostfix+ std::to_string(val.adress);
+            codePushBack("LOAD" + i);
         }
         else
         {
-            i = std::to_string(assignVertex->instruction.expression.getValue(0).value);
+            i = std::to_string(assignVertex->instruction.expression.getValue(0, procedure).value);
             codePushBack("SET " + i);
         }
-        i = std::to_string(assignVertex->instruction.getValue(0).adress);
-        code.push_back({"STORE " + i, 0});
+        val = assignVertex->instruction.getValue(0, procedure);
+        i =val.indirectPostfix+ std::to_string(assignVertex->instruction.getValue(0, procedure).adress);
+        code.push_back({"STORE" + i, 0});
         break;
     case o_plus:
-        addValues(assignVertex->instruction.expression.getValue(0), assignVertex->instruction.expression.getValue(1));
+    
+        addValues(assignVertex->instruction.expression.getValue(0, procedure), assignVertex->instruction.expression.getValue(1, procedure));
 
-        i = std::to_string(assignVertex->instruction.getValue(0).adress);
-        codePushBack({"STORE " + i, 0});
+        val = assignVertex->instruction.getValue(0, procedure);
+            i =val.indirectPostfix+ std::to_string(val.adress);
+        codePushBack({"STORE" + i, 0});
         break;
     case o_minus:
-        subValues(assignVertex->instruction.expression.getValue(0), assignVertex->instruction.expression.getValue(1));
+        subValues(assignVertex->instruction.expression.getValue(0, procedure), assignVertex->instruction.expression.getValue(1, procedure));
 
-        i = std::to_string(assignVertex->instruction.getValue(0).adress);
-        code.push_back({"STORE " + i, 0});
+        val = assignVertex->instruction.getValue(0, procedure);
+            i =val.indirectPostfix+ std::to_string(val.adress);
+        code.push_back({"STORE" + i, 0});
         break;
     case o_mult:
         if (v1.adress < 0)
         {
             v1.adress = freeMem + 2;
+            v1.indirectPostfix = " ";
             i = std::to_string(v1.value);
             codePushBack({"SET " + i, 0});
             i = std::to_string(v1.adress);
@@ -556,15 +632,17 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         }
         else
         {
-            i = std::to_string(v1.adress);
+            i =v1.indirectPostfix+ std::to_string(v1.adress);
             v1.adress = freeMem + 2;
-            codePushBack({"LOAD " + i, 0});
+            v1.indirectPostfix = " ";
+            codePushBack({"LOAD" + i, 0});
             i = std::to_string(v1.adress);
             code.push_back({"STORE " + i, 0});
         }
         if (v2.adress < 0)
         {
             v2.adress = freeMem + 3;
+            v2.indirectPostfix = " ";
             i = std::to_string(v2.value);
             codePushBack({"SET " + i, 0});
             i = std::to_string(v2.adress);
@@ -572,9 +650,10 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         }
         else
         {
-            i = std::to_string(v2.adress);
+            i =v2.indirectPostfix+ std::to_string(v2.adress);
             v2.adress = freeMem + 3;
-            codePushBack({"LOAD " + i, 0});
+            v2.indirectPostfix = " ";
+            codePushBack({"LOAD" + i, 0});
             i = std::to_string(v2.adress);
             code.push_back({"STORE " + i, 0});
         }
@@ -584,7 +663,6 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         i = std::to_string(freeMem);
         code.push_back({"STORE " + i, 0});
 
-        // while(v2>0)
         jumps_no++;
         jmp3 = jumps_no;
         i = std::to_string(v2.adress);
@@ -593,7 +671,6 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         jmp1 = jumps_no;
         code.push_back({"JZERO", jmp1});
 
-        //    if(v2%2==1)
         halfValue(v2);
 
         // double value
@@ -622,33 +699,31 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
 
         i = std::to_string(v1.adress);
         code.push_back({"STORE " + i, 0});
-        // b/=2
-        halfValue(v2); // robilismy przed chwila, mozna zapamietac
+        halfValue(v2);
 
         i = std::to_string(v2.adress);
         code.push_back({"STORE " + i, 0});
         // check if b>0 (do while)
         i = std::to_string(v2.adress);
-        code.push_back({"LOAD " + i, 0}); // niepotrzebna linia, b w accu po halfie
+        code.push_back({"LOAD " + i, 0});
 
-        code.push_back({"JPOS", jmp3}); // tu skaczemy z while
+        code.push_back({"JPOS", jmp3});
 
-        // assign p=tmp
         i = std::to_string(freeMem);
         code.push_back({"LOAD " + i, 0});
 
-        i = std::to_string(assignVertex->instruction.getValue(0).adress);
-        code.push_back({"STORE " + i, jmp1});
+        val = assignVertex->instruction.getValue(0, procedure);
+            i =val.indirectPostfix+ std::to_string(val.adress);
+        code.push_back({"STORE" + i, jmp1});
         break;
-    //moze byc odwrocona kolejnosc
-    case o_div:
+    case o_div: 
         // initialise tmp
         jumps_no++;
         jmp5=jumps_no;
-
         if (v1.adress < 0)
         {
             v1.adress = freeMem + 3;
+            v1.indirectPostfix = " ";
             i = std::to_string(v1.value);
             codePushBack({"SET " + i, 0});
             i = std::to_string(v1.adress);
@@ -656,15 +731,17 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         }
         else
         {
-            i = std::to_string(v1.adress);
+            i =v1.indirectPostfix+ std::to_string(v1.adress);
             v1.adress = freeMem + 3;
-            codePushBack({"LOAD " + i, 0});
+            v1.indirectPostfix = " ";
+            codePushBack({"LOAD" + i, 0});
             i = std::to_string(v1.adress);
             code.push_back({"STORE " + i, 0});
         }
         if (v2.adress < 0)
         {
             v2.adress = freeMem + 4;
+            v2.indirectPostfix = " ";
             i = std::to_string(v2.value);
             codePushBack({"SET " + i, 0});
             i = std::to_string(v2.adress);
@@ -672,12 +749,14 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         }
         else
         {
-            i = std::to_string(v2.adress);
+            i =v2.indirectPostfix+ std::to_string(v2.adress);
             v2.adress = freeMem + 4;
-            codePushBack({"LOAD " + i, 0});
+            v2.indirectPostfix = " ";
+            codePushBack({"LOAD" + i, 0});
             i = std::to_string(v2.adress);
             code.push_back({"STORE " + i, 0});
         }
+
 
         //check v2==0 (mamy w accu 0)
         code.push_back({"JZERO", jmp5});
@@ -710,9 +789,7 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         code.push_back({"LOAD " + i});
         i = std::to_string(freeMem);
         code.push_back({"SUB " + i, 0}); // double c
-        ////i = std::to_string(v1.adress);
         code.push_back({"SUB " + i, 0});
-        // i=std::to_string(v1.adress);
         jumps_no++;
         jmp3 = jumps_no;
         code.push_back({"JZERO", jmp3});
@@ -759,16 +836,17 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         i = std::to_string(freeMem + 2);
         code.push_back({"LOAD " + i, jmp1});
 
-        i = std::to_string(assignVertex->instruction.getValue(0).adress);
-        code.push_back({"STORE " + i, jmp5});
+        val = assignVertex->instruction.getValue(0, procedure);
+            i =val.indirectPostfix+ std::to_string(val.adress);
+        code.push_back({"STORE" + i, 0});
         break;
     case o_mod:
-        jumps_no++;
+    jumps_no++;
         jmp5=jumps_no;
-        // initialise tmp
         if (v1.adress < 0)
         {
             v1.adress = freeMem + 3;
+            v1.indirectPostfix = " ";
             i = std::to_string(v1.value);
             codePushBack({"SET " + i, 0});
             i = std::to_string(v1.adress);
@@ -776,15 +854,17 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         }
         else
         {
-            i = std::to_string(v1.adress);
+            i =v1.indirectPostfix+ std::to_string(v1.adress);
             v1.adress = freeMem + 3;
-            codePushBack({"LOAD " + i, 0});
+            v1.indirectPostfix = " ";
+            codePushBack({"LOAD" + i, 0});
             i = std::to_string(v1.adress);
             code.push_back({"STORE " + i, 0});
         }
         if (v2.adress < 0)
         {
             v2.adress = freeMem + 4;
+            v2.indirectPostfix = " ";
             i = std::to_string(v2.value);
             codePushBack({"SET " + i, 0});
             i = std::to_string(v2.adress);
@@ -792,16 +872,16 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         }
         else
         {
-            i = std::to_string(v2.adress);
+            i =v2.indirectPostfix+ std::to_string(v2.adress);
             v2.adress = freeMem + 4;
-            codePushBack({"LOAD " + i, 0});
+            v2.indirectPostfix = " ";
+            codePushBack({"LOAD" + i, 0});
             i = std::to_string(v2.adress);
             code.push_back({"STORE " + i, 0});
         }
 
         //check v2==0 (mamy w accu 0)
         code.push_back({"JZERO", jmp5});
-
         // initialise cnt
         i = std::to_string(0);
         code.push_back({"SET " + i, 0});
@@ -830,9 +910,7 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         code.push_back({"LOAD " + i});
         i = std::to_string(freeMem);
         code.push_back({"SUB " + i, 0}); // double c
-        ////i = std::to_string(v1.adress);
         code.push_back({"SUB " + i, 0});
-        // i=std::to_string(v1.adress);
         jumps_no++;
         jmp3 = jumps_no;
         code.push_back({"JZERO", jmp3});
@@ -845,7 +923,6 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         code.push_back({"STORE " + i, 0});
         //      c=2c
         i = std::to_string(freeMem);
-        
         code.push_back({"LOAD " + i, 0});
         code.push_back({"ADD " + i, 0});
         code.push_back({"STORE " + i, 0});
@@ -872,7 +949,6 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         i = std::to_string(v1.adress);
         code.push_back({"STORE " + i, 0});
         // warun 2 petli
-
         subValues(v2, v1);
         code.push_back({"JZERO", jmp2});
 
@@ -880,28 +956,42 @@ void translateAssignVertex(std::shared_ptr<InstructionVertex> &assignVertex)
         i = std::to_string(v1.adress);
         code.push_back({"LOAD " + i, jmp1});
 
-        i = std::to_string(assignVertex->instruction.getValue(0).adress);
-        code.push_back({"STORE " + i, jmp5});
+        val = assignVertex->instruction.getValue(0, procedure);
+            i =val.indirectPostfix+ std::to_string(val.adress);
+        code.push_back({"STORE" + i, 0});
         break;
     }
 }
 
-void translateConditionalEdge(ConditionalEdge &edge)
+
+void transalteProcedureVertex(std::shared_ptr<ProcedureInstructionVertex> procedureVertex, Procedure universe)
 {
-    Line jump;
-    if(edge.condition.comparission==c_true)
-    {
-        jumps_no++;
-        // Line jump;
-        jump.instruction = "JUMP";
-        jump.jump_number = jumps_no;
-        code.push_back(jump);
-        return;
-    }
-    Value v1 = edge.condition.getValue(0);
-    Value v2 = edge.condition.getValue(1);
+    Procedure procedure = procedures[procedureVertex->instruction.values[0]];
     std::string i;
-    
+    for(int m = 0; m<procedure.refVariables.size(); m++)
+    {
+        i=std::to_string(universe.variables[ procedureVertex->instruction.values[m+1]].adress);
+
+        if(universe.variables[ procedureVertex->instruction.values[m+1]].refNo>-1)
+            codePushBack("LOAD "+i);
+        else
+            codePushBack("SET "+i);
+        i=std::to_string(procedure.variables[procedure.refVariables[m]].adress);
+        codePushBack("STORE " + i);
+    }
+    i=std::to_string(code.size()+3);
+    codePushBack("SET "+i);
+    i=std::to_string(procedure.retAdd);
+    codePushBack("STORE "+i);
+    code.push_back({"JUMP", procedure.jumpNo});
+}
+
+void translateConditionalEdge(ProcedureConditionalEdge &edge, Procedure procedure)
+{
+    ProcedureValue v1 = edge.condition.getValue(0, procedure);
+    ProcedureValue v2 = edge.condition.getValue(1, procedure);
+    std::string i;
+    Line jump;
     switch (edge.condition.comparission)
     {
     case neq:
@@ -918,7 +1008,6 @@ void translateConditionalEdge(ConditionalEdge &edge)
         jump.instruction = "JPOS";
         jump.jump_number = jumps_no;
         code.push_back(jump);
-        // return &code.back();
         break;
     case eq:
         subValues(v1, v2);
@@ -973,15 +1062,14 @@ void translateConditionalEdge(ConditionalEdge &edge)
         jump.jump_number = jumps_no;
         code.push_back(jump);
         break;
-
     }
 }
 
-void translateNegConditionalEdge(ConditionalEdge &edge)
+void translateNegConditionalEdge(ProcedureConditionalEdge &edge, Procedure procedure)
 {
     Line jump;
-    Value v1 = edge.condition.getValue(0);
-    Value v2 = edge.condition.getValue(1);
+    ProcedureValue v1 = edge.condition.getValue(0, procedure);
+    ProcedureValue v2 = edge.condition.getValue(1, procedure);
     std::string i;
     switch (edge.condition.comparission)
     {
@@ -1015,7 +1103,6 @@ void translateNegConditionalEdge(ConditionalEdge &edge)
         jump.instruction = "JZERO";
         jump.jump_number = jumps_no;
         code.push_back(jump);
-        // return &code.back();
         break;
     case lte: //~gt
         subValues(v1, v2);
@@ -1056,56 +1143,34 @@ void translateNegConditionalEdge(ConditionalEdge &edge)
         code.push_back(jump);
         break;
     }
+
+    // return NULL;
 }
 
-void transalteProcedureVertex(std::shared_ptr<InstructionVertex> procedureVertex)
+std::shared_ptr<ProcedureInstructionVertex> getDispressionEnd(std::shared_ptr<ProcedureInstructionVertex> &dispressionVertex)
 {
-    Procedure procedure = procedures[procedureVertex->instruction.values[0]];
-    std::string i;
-    for(int m = 0; m<procedure.refVariables.size(); m++)
-    {
-        i=std::to_string(variables[ procedureVertex->instruction.values[m+1]].adress);
-        codePushBack("SET "+i);
-        i=std::to_string(procedure.variables[procedure.refVariables[m]].adress);
-        codePushBack("STORE " + i);
-    }
-    i=std::to_string(code.size()+3);
-    codePushBack("SET "+i);
-    i=std::to_string(procedure.retAdd);
-    codePushBack("STORE "+i);
-    //check czy jumpno>0, inaczej niezainicjowana
-    code.push_back({"JUMP", procedure.jumpNo});
-}
-
-std::shared_ptr<InstructionVertex> getDispressionEnd(std::shared_ptr<InstructionVertex> &dispressionVertex)
-{
-    std::shared_ptr<InstructionVertex> activeVertex = dispressionVertex->edges[0].end;
+    std::shared_ptr<ProcedureInstructionVertex> activeVertex = dispressionVertex->edges[0].end;
     while (activeVertex->instruction.operation != o_DISPRESSION_END)
     {
         switch (activeVertex->instruction.operation)
         {
         case o_DISPRESSION_BEGIN:
             activeVertex = getDispressionEnd(activeVertex);
-            //edge x petli
-            if(activeVertex->edges.size()>1)
-                activeVertex = activeVertex->edges[1].end;
-            else
-                activeVertex = activeVertex->edges[0].end;
+            activeVertex = activeVertex->edges[0].end;
             break;
         default:
-                activeVertex = activeVertex->edges[0].end;
-            
+            activeVertex = activeVertex->edges[0].end;
             break;
         }
 
+        // error
     }
     return activeVertex;
 }
 
-std::shared_ptr<InstructionVertex> translateDispressionVertex(std::shared_ptr<InstructionVertex> &dispressionVertex)
+std::shared_ptr<ProcedureInstructionVertex> translateDispressionVertex(std::shared_ptr<ProcedureInstructionVertex> &dispressionVertex, Procedure procedure)
 {
-    std::shared_ptr<InstructionVertex> endVertex = getDispressionEnd(dispressionVertex);
-
+    std::shared_ptr<ProcedureInstructionVertex> endVertex = getDispressionEnd(dispressionVertex);
 
     int end_jump_no = 0;
     if (endVertex->edges.size() > 1)
@@ -1118,7 +1183,7 @@ std::shared_ptr<InstructionVertex> translateDispressionVertex(std::shared_ptr<In
         jump_to_merge = end_jump_no;
     }
 
-    std::shared_ptr<InstructionVertex> activeVertex;
+    std::shared_ptr<ProcedureInstructionVertex> activeVertex;
     if (dispressionVertex->edges[0].condition.comparission == c_true)
     {
         activeVertex = dispressionVertex->edges[0].end;
@@ -1127,22 +1192,22 @@ std::shared_ptr<InstructionVertex> translateDispressionVertex(std::shared_ptr<In
             switch (activeVertex->instruction.operation)
             {
             case o_ASSIGN:
-                translateAssignVertex(activeVertex);
+                translateAssignVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_WRITE:
-                translateWriteVertex(activeVertex);
+                translateWriteVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_READ:
-                translateReadVertex(activeVertex);
+                translateReadVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_DISPRESSION_BEGIN:
-                activeVertex = translateDispressionVertex(activeVertex);
+                activeVertex = translateDispressionVertex(activeVertex, procedure);
                 break;
             case o_CALL_PROC:
-                transalteProcedureVertex(activeVertex);
+                transalteProcedureVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_OP_NULL:
@@ -1150,6 +1215,7 @@ std::shared_ptr<InstructionVertex> translateDispressionVertex(std::shared_ptr<In
                 break;
             }
 
+            // error
         }
     }
     else if (dispressionVertex->edges[0].condition.comparission == c_false)
@@ -1160,34 +1226,36 @@ std::shared_ptr<InstructionVertex> translateDispressionVertex(std::shared_ptr<In
             switch (activeVertex->instruction.operation)
             {
             case o_ASSIGN:
-                translateAssignVertex(activeVertex);
+                translateAssignVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_WRITE:
-                translateWriteVertex(activeVertex);
+                translateWriteVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_READ:
-                translateReadVertex(activeVertex);
+                translateReadVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_DISPRESSION_BEGIN:
-                activeVertex = translateDispressionVertex(activeVertex);
+                activeVertex = translateDispressionVertex(activeVertex, procedure);
                 break;
             case o_CALL_PROC:
-                transalteProcedureVertex(activeVertex);
+                transalteProcedureVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_OP_NULL:
                 activeVertex = activeVertex->edges[0].end;
                 break;
             }
+
+            // error
         }
     }
     // jesli program w drugim edgu jest pusty
     else if (dispressionVertex->edges[1].end->instruction.operation == o_DISPRESSION_END)
     {
-        translateNegConditionalEdge(dispressionVertex->edges[0]);
+        translateNegConditionalEdge(dispressionVertex->edges[0], procedure);
         Line &jump = code.back();
         jumps_no++;
         jump.jump_number = jumps_no;
@@ -1198,22 +1266,22 @@ std::shared_ptr<InstructionVertex> translateDispressionVertex(std::shared_ptr<In
             switch (activeVertex->instruction.operation)
             {
             case o_ASSIGN:
-                translateAssignVertex(activeVertex);
+                translateAssignVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_WRITE:
-                translateWriteVertex(activeVertex);
+                translateWriteVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_READ:
-                translateReadVertex(activeVertex);
+                translateReadVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_DISPRESSION_BEGIN:
-                activeVertex = translateDispressionVertex(activeVertex);
+                activeVertex = translateDispressionVertex(activeVertex, procedure);
                 break;
             case o_CALL_PROC:
-                transalteProcedureVertex(activeVertex);
+                transalteProcedureVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_OP_NULL:
@@ -1232,7 +1300,7 @@ std::shared_ptr<InstructionVertex> translateDispressionVertex(std::shared_ptr<In
     }
     else
     {
-        translateNegConditionalEdge(dispressionVertex->edges[0]);
+        translateNegConditionalEdge(dispressionVertex->edges[0], procedure);
         Line &jump1 = code.back();
         int our_jump_no1 = jump1.jump_number;
 
@@ -1242,22 +1310,22 @@ std::shared_ptr<InstructionVertex> translateDispressionVertex(std::shared_ptr<In
             switch (activeVertex->instruction.operation)
             {
             case o_ASSIGN:
-                translateAssignVertex(activeVertex);
+                translateAssignVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_WRITE:
-                translateWriteVertex(activeVertex);
+                translateWriteVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_READ:
-                translateReadVertex(activeVertex);
+                translateReadVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_DISPRESSION_BEGIN:
-                activeVertex = translateDispressionVertex(activeVertex);
+                activeVertex = translateDispressionVertex(activeVertex, procedure);
                 break;
             case o_CALL_PROC:
-                transalteProcedureVertex(activeVertex);
+                transalteProcedureVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_OP_NULL:
@@ -1268,6 +1336,7 @@ std::shared_ptr<InstructionVertex> translateDispressionVertex(std::shared_ptr<In
             // error
         }
         jumps_no++;
+
         int our_jump_no2=jumps_no;
         if(jump_to_merge>0)   our_jump_no2=jump_to_merge;
         else
@@ -1283,22 +1352,22 @@ std::shared_ptr<InstructionVertex> translateDispressionVertex(std::shared_ptr<In
             switch (activeVertex->instruction.operation)
             {
             case o_ASSIGN:
-                translateAssignVertex(activeVertex);
+                translateAssignVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_WRITE:
-                translateWriteVertex(activeVertex);
+                translateWriteVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_READ:
-                translateReadVertex(activeVertex);
+                translateReadVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_DISPRESSION_BEGIN:
-                activeVertex = translateDispressionVertex(activeVertex);
+                activeVertex = translateDispressionVertex(activeVertex, procedure);
                 break;
             case o_CALL_PROC:
-                transalteProcedureVertex(activeVertex);
+                transalteProcedureVertex(activeVertex, procedure);
                 activeVertex = activeVertex->edges[0].end;
                 break;
             case o_OP_NULL:
@@ -1308,70 +1377,20 @@ std::shared_ptr<InstructionVertex> translateDispressionVertex(std::shared_ptr<In
 
             // error
         }
+        
         jump_to_merge = our_jump_no2;
-        // return activeVertex;
     }
     // jesli petla
     if (end_jump_no > 0)
     {
-        
-        translateConditionalEdge(endVertex->edges[0]);
+        translateConditionalEdge(endVertex->edges[0], procedure);
         Line &jmp = code.back();
         jmp.jump_number = end_jump_no;
-        return endVertex->edges[1].end;
     }
-    return endVertex->edges[0].end;
-
-}
-
-void codePushBack(std::string instruction)
-{
-    code.push_back({instruction, jump_to_merge});
-
-    if (jump_to_merge > 0)
-        jump_to_merge = 0;
-}
-
-void jumpMerge()
-{
-    for (int j = 0; j < code.size(); j++)
+    for (ProcedureEdge e : activeVertex->edges)
     {
-        Line &jumpLine = code[j];
-        if (jumpLine.jump_number > 0)
-        {
-            std::string cmd = jumpLine.instruction;
-            // jesli mamy jumpa
-            if (jumpLine.jump_number > 0 && (!cmd.compare("JUMP") || !cmd.compare("JZERO") || !cmd.compare("JPOS")))
-            {
-                int jmpno = jumpLine.jump_number;
-                bool jump_merged = false;
-                for (int i = 0; i < code.size(); i++)
-                {
-                    Line line = code[i];
-                    if (line.jump_number == jmpno)
-                    {
-                        std::string cmd2 = line.instruction;
-                        // jesli nie na jumpie
-                        if (cmd2.find("JUMP") == std::string::npos && cmd2.find("JZERO") == std::string::npos && cmd2.find("JPOS") == std::string::npos)
-                        {
-                            jumpLine.instruction.append(" " + std::to_string(i));
-                            jump_merged = true;
-                        }
-                    }
-                    else if(line.jump_jump_number == jmpno)
-                    {
-                        jumpLine.instruction.append(" " + std::to_string(i));
-                        jump_merged = true;
-                    }
-                }
-                // jump moze nie miec odpowiednika, moze miec to miejsce np
-                // przy zagniezdzonych dispr gdy nie ma instrukcji
-                if (!jump_merged)
-                {
-                    jumpLine.instruction.append(" " + std::to_string(j + 1));
-                }
-            }
-        }
+        if (e.condition.comparission == c_true)
+            return e.end;
     }
+    return nullptr;
 }
-
